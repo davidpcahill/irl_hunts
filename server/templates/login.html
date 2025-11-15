@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>IRL Hunts - Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d1b2a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            font-size: 3em;
+            background: linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+        
+        .logo p {
+            color: #888;
+            font-size: 1.1em;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 25px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 4px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .tab.active {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a5a);
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+        }
+        
+        .tab:not(.active):hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #ff6b6b;
+            background: rgba(0,0,0,0.5);
+            box-shadow: 0 0 20px rgba(255,107,107,0.2);
+        }
+        
+        input::placeholder {
+            color: #555;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a5a);
+            color: white;
+            box-shadow: 0 4px 20px rgba(255,107,107,0.4);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(255,107,107,0.6);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-admin {
+            background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+            box-shadow: 0 4px 20px rgba(108,92,231,0.4);
+        }
+        
+        .btn-admin:hover {
+            box-shadow: 0 8px 30px rgba(108,92,231,0.6);
+        }
+        
+        .error {
+            background: rgba(255,0,0,0.2);
+            border: 1px solid #ff4757;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            animation: shake 0.5s ease;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .info-box {
+            background: rgba(72,219,251,0.1);
+            border: 1px solid rgba(72,219,251,0.3);
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        
+        .info-box h3 {
+            color: #48dbfb;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .info-box p {
+            color: #aaa;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .info-box code {
+            background: rgba(0,0,0,0.4);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #feca57;
+        }
+        
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #555;
+            position: relative;
+        }
+        
+        .divider::before, .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🎯 IRL HUNTS</h1>
+            <p>Predator vs Prey</p>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('player')">Player</div>
+            <div class="tab" onclick="switchTab('admin')">Admin</div>
+        </div>
+        
+        <div id="error" class="error"></div>
+        
+        <div id="player-tab" class="tab-content active">
+            <form onsubmit="loginPlayer(event)">
+                <div class="form-group">
+                    <label>Tracker ID</label>
+                    <input type="text" id="device_id" placeholder="e.g., T9EF0" 
+                           pattern="[A-Za-z0-9]{4,10}" required
+                           style="text-transform: uppercase;" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Your Nickname (optional)</label>
+                    <input type="text" id="nickname" placeholder="e.g., ShadowWolf" maxlength="30">
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    Enter Game 🎮
+                </button>
+            </form>
+            
+            <div class="info-box">
+                <h3>📱 How to Join</h3>
+                <p>
+                    1. Look at your tracker's OLED screen for your ID (e.g., <code>T9EF0</code>)<br>
+                    2. Enter it above with an optional nickname<br>
+                    3. Choose your role: Prey 🐰 or Predator 🦊
+                </p>
+            </div>
+        </div>
+        
+        <div id="admin-tab" class="tab-content">
+            <form onsubmit="loginAdmin(event)">
+                <div class="form-group">
+                    <label>Admin Password</label>
+                    <input type="password" id="admin_pass" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="btn btn-admin">
+                    Admin Login 🔐
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'player') {
+                document.querySelector('.tab:first-child').classList.add('active');
+                document.getElementById('player-tab').classList.add('active');
+            } else {
+                document.querySelector('.tab:last-child').classList.add('active');
+                document.getElementById('admin-tab').classList.add('active');
+            }
+        }
+        
+        function showError(msg) {
+            const err = document.getElementById('error');
+            err.textContent = msg;
+            err.style.display = 'block';
+            setTimeout(() => err.style.display = 'none', 5000);
+        }
+        
+        async function loginPlayer(e) {
+            e.preventDefault();
+            const deviceId = document.getElementById('device_id').value.toUpperCase().trim();
+            const nickname = document.getElementById('nickname').value.trim();
+            
+            try {
+                const resp = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({device_id: deviceId})
+                });
+                
+                const data = await resp.json();
+                if (data.success) {
+                    // Set nickname if provided
+                    if (nickname) {
+                        await fetch('/api/player', {
+                            method: 'PUT',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({nickname: nickname})
+                        });
+                    }
+                    window.location.href = '/dashboard';
+                } else {
+                    showError(data.error || 'Login failed');
+                }
+            } catch (err) {
+                showError('Connection error. Is the server running?');
+            }
+        }
+        
+        async function loginAdmin(e) {
+            e.preventDefault();
+            const password = document.getElementById('admin_pass').value;
+            
+            try {
+                const resp = await fetch('/api/admin_login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({password: password})
+                });
+                
+                const data = await resp.json();
+                if (data.success) {
+                    window.location.href = '/admin';
+                } else {
+                    showError(data.error || 'Invalid password');
+                }
+            } catch (err) {
+                showError('Connection error');
+            }
+        }
+    </script>
+</body>
+</html>

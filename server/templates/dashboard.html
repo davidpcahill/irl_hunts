@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>IRL Hunts - Play</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a14;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(90deg, #1a1a2e, #16213e);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        .header h1 {
+            font-size: 1.3em;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header-info {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .player-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+        
+        .player-badge img {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .phase-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .phase-lobby { background: #636e72; }
+        .phase-countdown { background: #fdcb6e; color: #000; animation: pulse 1s infinite; }
+        .phase-running { background: #00b894; }
+        .phase-paused { background: #e17055; }
+        .phase-ended { background: #6c5ce7; }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .main {
+            padding: 15px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        
+        @media (min-width: 768px) {
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+        
+        @media (min-width: 1200px) {
+            .grid { grid-template-columns: 1fr 1fr 1fr; }
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 20px;
+            transition: transform 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .card h2 {
+            font-size: 1.1em;
+            color: #888;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-card {
+            background: linear-gradient(135deg, rgba(255,107,107,0.1), rgba(254,202,87,0.1));
+            border-color: rgba(255,107,107,0.2);
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .stat-label { color: #888; }
+        .stat-value { font-weight: 700; }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        
+        .btn:hover { transform: translateY(-2px); }
+        .btn:active { transform: translateY(0); }
+        
+        .btn-prey { background: #00cec9; color: #000; }
+        .btn-pred { background: #ff7675; color: #fff; }
+        .btn-success { background: #00b894; color: #fff; }
+        .btn-warning { background: #fdcb6e; color: #000; }
+        .btn-danger { background: #d63031; color: #fff; }
+        .btn-primary { background: #0984e3; color: #fff; }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .timer {
+            font-size: 2.5em;
+            font-weight: 700;
+            text-align: center;
+            color: #feca57;
+            font-family: monospace;
+        }
+        
+        .leaderboard {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        
+        .lb-section h3 {
+            color: #666;
+            font-size: 0.85em;
+            margin: 15px 0 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .lb-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .lb-rank {
+            font-size: 1.4em;
+            font-weight: 700;
+            width: 35px;
+        }
+        
+        .rank-1 { color: #ffd700; }
+        .rank-2 { color: #c0c0c0; }
+        .rank-3 { color: #cd7f32; }
+        
+        .lb-pic {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            margin-right: 10px;
+            object-fit: cover;
+            background: #333;
+        }
+        
+        .lb-info { flex: 1; }
+        .lb-name { font-weight: 600; }
+        .lb-stats { font-size: 0.85em; color: #888; }
+        
+        .lb-points {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #feca57;
+        }
+        
+        .online-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .online { background: #00b894; }
+        .offline { background: #636e72; }
+        .in-safe { background: #48dbfb; }
+        
+        .messages {
+            height: 250px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .msg {
+            margin-bottom: 8px;
+            padding: 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+        }
+        
+        .msg-header {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .msg-from { color: #48dbfb; font-weight: 600; }
+        .msg-content { color: #ccc; }
+        
+        .msg-form {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .msg-form input, .msg-form select {
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        
+        .msg-form input { flex: 1; }
+        
+        .profile-section {
+            text-align: center;
+        }
+        
+        .profile-pic {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 15px;
+            border: 3px solid rgba(255,255,255,0.2);
+            background: #333;
+        }
+        
+        .profile-upload {
+            display: none;
+        }
+        
+        .upload-label {
+            display: inline-block;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .upload-label:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .sighting-btn {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #0984e3;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(9,132,227,0.5);
+            z-index: 1000;
+        }
+        
+        .emergency-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #d63031;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(214,48,49,0.5);
+            z-index: 1000;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: #00b894;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            animation: slideIn 0.3s ease;
+            z-index: 2000;
+            max-width: 300px;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .notification.error { background: #d63031; }
+        .notification.warning { background: #e17055; }
+        .notification.info { background: #0984e3; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal.active { display: flex; }
+        
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #fff;
+        }
+        
+        .close-btn {
+            float: right;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .gallery img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        
+        .captured-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(214,48,49,0.95);
+            z-index: 4000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .captured-overlay.active { display: flex; }
+        
+        .captured-overlay h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+        
+        .captured-overlay p {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+        }
+        
+        .logout-btn {
+            background: transparent;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .logout-btn:hover {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .photo-preview {
+            width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        select {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 IRL HUNTS</h1>
+        <div class="header-info">
+            <div class="player-badge">
+                <img id="header-pic" src="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2240%22>?</text></svg>'">
+                <span id="header-name">{{ player.name }}</span>
+            </div>
+            <div id="phase-badge" class="phase-badge phase-lobby">LOBBY</div>
+            <button class="logout-btn" onclick="logout()">Exit</button>
+        </div>
+    </div>
+    
+    <div class="main">
+        <div class="grid">
+            <!-- Profile & Status -->
+            <div class="card status-card">
+                <h2>👤 Your Profile</h2>
+                <div class="profile-section">
+                    <img id="profile-pic" class="profile-pic" src="{{ player.profile_pic or '' }}" 
+                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2240%22>?</text></svg>'">
+                    <br>
+                    <input type="file" id="pic-upload" accept="image/*" onchange="uploadProfilePic(this)">
+                    <label for="pic-upload" class="upload-label">📷 Change Photo</label>
+                </div>
+                
+                <div class="stat-row">
+                    <span class="stat-label">Nickname</span>
+                    <span class="stat-value" id="your-name">{{ player.name }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Tracker ID</span>
+                    <span class="stat-value">{{ player.device_id }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Role</span>
+                    <span class="stat-value" id="your-role">{{ player.role|upper }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value" id="your-status">{{ player.status|upper }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Points</span>
+                    <span class="stat-value" id="your-points">{{ player.points }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Safe Zone</span>
+                    <span class="stat-value" id="your-safezone">{{ 'YES' if player.in_safe_zone else 'NO' }}</span>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    {% if player.role == 'unassigned' %}
+                    <p style="color: #feca57; margin-bottom: 10px;">Choose your role:</p>
+                    <div class="btn-group">
+                        <button class="btn btn-prey" onclick="setRole('prey')">🐰 Prey</button>
+                        <button class="btn btn-pred" onclick="setRole('pred')">🦊 Predator</button>
+                    </div>
+                    {% else %}
+                    <button class="btn btn-success" onclick="setReady()" id="ready-btn" style="width: 100%;">
+                        ✅ Ready to Play
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Game Timer -->
+            <div class="card">
+                <h2>⏱️ Game Time</h2>
+                <div id="timer" class="timer">--:--</div>
+                <p id="game-info" style="text-align: center; color: #888; margin-top: 10px;">
+                    Waiting for game to start...
+                </p>
+                
+                {% if is_mod %}
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <p style="color: #888; font-size: 12px; margin-bottom: 10px;">MOD CONTROLS</p>
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="startGame()">▶️</button>
+                        <button class="btn btn-warning" onclick="pauseGame()">⏸️</button>
+                        <button class="btn btn-danger" onclick="endGame()">⏹️</button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Leaderboard -->
+            <div class="card">
+                <h2>🏆 Leaderboard</h2>
+                <div class="leaderboard">
+                    <div class="lb-section">
+                        <h3>🦊 Predators</h3>
+                        <div id="pred-lb"></div>
+                    </div>
+                    <div class="lb-section">
+                        <h3>🐰 Prey</h3>
+                        <div id="prey-lb"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Messages -->
+            <div class="card">
+                <h2>💬 Chat</h2>
+                <div id="messages" class="messages"></div>
+                <div class="msg-form">
+                    <select id="msg-to">
+                        <option value="all">All</option>
+                        <option value="team">Team</option>
+                    </select>
+                    <input type="text" id="msg-input" placeholder="Type message..." maxlength="500">
+                    <button class="btn btn-primary" onclick="sendMsg()">Send</button>
+                </div>
+            </div>
+            
+            <!-- Photo Gallery -->
+            <div class="card">
+                <h2>📸 Sightings</h2>
+                <div id="gallery" class="gallery">
+                    <p style="color: #888; text-align: center; grid-column: 1/-1;">No photos yet</p>
+                </div>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="openSightingModal()">
+                    📷 Upload Sighting (+{{ sighting_points if sighting_points else 25 }} pts)
+                </button>
+            </div>
+            
+            <!-- Players Online -->
+            <div class="card">
+                <h2>👥 Players Online</h2>
+                <div id="players-list" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Floating Buttons -->
+    <button class="sighting-btn" onclick="openSightingModal()" title="Photo Sighting">📷</button>
+    <button class="emergency-btn" onclick="triggerEmergency()" title="Emergency">🚨</button>
+    
+    <!-- Captured Overlay -->
+    <div id="captured-overlay" class="captured-overlay">
+        <h1>🚫 CAPTURED!</h1>
+        <p id="captured-msg">You were caught!</p>
+        <p>Get to a SAFE ZONE beacon to escape!</p>
+        <button class="btn btn-success" onclick="dismissCaptured()">I Understand</button>
+    </div>
+    
+    <!-- Sighting Upload Modal -->
+    <div id="sighting-modal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeSightingModal()">×</button>
+            <h2>📷 Upload Sighting</h2>
+            <p style="color: #888; margin-bottom: 15px;">
+                Take a photo of another player to earn points!
+            </p>
+            
+            <select id="sighting-target">
+                <option value="">Select target player...</option>
+            </select>
+            
+            <input type="file" id="sighting-photo" accept="image/*" capture="environment" onchange="previewSighting(this)">
+            <label for="sighting-photo" class="btn btn-primary" style="display: block; text-align: center; margin: 10px 0;">
+                📸 Take/Select Photo
+            </label>
+            
+            <img id="sighting-preview" class="photo-preview">
+            
+            <button class="btn btn-success" style="width: 100%;" onclick="submitSighting()">
+                Upload Sighting
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        const socket = io();
+        const playerId = "{{ player.device_id }}";
+        let playerData = {{ player|tojson }};
+        
+        socket.on('connect', () => console.log('Connected'));
+        
+        socket.on('game_event', (event) => {
+            console.log('Event:', event);
+            loadLeaderboard();
+            loadPlayers();
+        });
+        
+        socket.on('capture_event', (data) => {
+            notify(`🎯 ${data.pred} captured ${data.prey}!`, 'warning');
+        });
+        
+        socket.on('escape_event', (data) => {
+            notify(`🏃 ${data.prey} escaped!`, 'info');
+        });
+        
+        socket.on('sighting_event', (data) => {
+            notify(`📸 ${data.spotter} spotted ${data.target}!`, 'info');
+            loadGallery();
+        });
+        
+        socket.on('notification', (data) => {
+            notify(data.message, data.type);
+        });
+        
+        socket.on('player_updated', (player) => {
+            if (player.device_id === playerId) {
+                updateMyStatus(player);
+            }
+            loadPlayers();
+        });
+        
+        socket.on('game_starting', (data) => {
+            notify(`Game starting in ${data.countdown} seconds!`, 'warning');
+            updatePhase('countdown');
+        });
+        
+        socket.on('game_started', () => {
+            notify('🎮 GAME STARTED!', 'success');
+            updatePhase('running');
+        });
+        
+        socket.on('game_paused', () => {
+            notify('⏸️ Game paused', 'warning');
+            updatePhase('paused');
+        });
+        
+        socket.on('game_resumed', () => {
+            notify('▶️ Game resumed', 'success');
+            updatePhase('running');
+        });
+        
+        socket.on('game_ended', (data) => {
+            notify('🏁 Game ended!', 'info');
+            updatePhase('ended');
+        });
+        
+        socket.on('new_message', (msg) => {
+            addMessage(msg);
+        });
+        
+        function notify(message, type = 'success') {
+            const notif = document.createElement('div');
+            notif.className = `notification ${type}`;
+            notif.textContent = message;
+            document.body.appendChild(notif);
+            setTimeout(() => notif.remove(), 4000);
+        }
+        
+        function updatePhase(phase) {
+            const badge = document.getElementById('phase-badge');
+            badge.className = `phase-badge phase-${phase}`;
+            badge.textContent = phase.toUpperCase();
+        }
+        
+        function updateMyStatus(player) {
+            playerData = player;
+            document.getElementById('your-name').textContent = player.name;
+            document.getElementById('your-role').textContent = player.role.toUpperCase();
+            document.getElementById('your-status').textContent = player.status.toUpperCase();
+            document.getElementById('your-points').textContent = player.points;
+            document.getElementById('your-safezone').textContent = player.in_safe_zone ? 'YES' : 'NO';
+            document.getElementById('header-name').textContent = player.name;
+            
+            if (player.profile_pic) {
+                document.getElementById('profile-pic').src = player.profile_pic;
+                document.getElementById('header-pic').src = player.profile_pic;
+            }
+            
+            if (player.status === 'captured' && !document.getElementById('captured-overlay').classList.contains('dismissed')) {
+                document.getElementById('captured-overlay').classList.add('active');
+            }
+        }
+        
+        function dismissCaptured() {
+            document.getElementById('captured-overlay').classList.remove('active');
+            document.getElementById('captured-overlay').classList.add('dismissed');
+        }
+        
+        async function setRole(role) {
+            const resp = await fetch('/api/player', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({role})
+            });
+            if (resp.ok) {
+                notify(`You are now a ${role}!`, 'success');
+                location.reload();
+            } else {
+                const data = await resp.json();
+                notify(data.error, 'error');
+            }
+        }
+        
+        async function setReady() {
+            const resp = await fetch('/api/player', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: 'ready'})
+            });
+            if (resp.ok) {
+                notify('You are ready!', 'success');
+                document.getElementById('ready-btn').textContent = '✅ Ready!';
+                document.getElementById('ready-btn').disabled = true;
+            }
+        }
+        
+        async function uploadProfilePic(input) {
+            if (!input.files[0]) return;
+            
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+            
+            const resp = await fetch('/api/player/photo', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (resp.ok) {
+                const data = await resp.json();
+                document.getElementById('profile-pic').src = data.url;
+                document.getElementById('header-pic').src = data.url;
+                notify('Profile picture updated!', 'success');
+            } else {
+                notify('Failed to upload', 'error');
+            }
+        }
+        
+        async function loadGameState() {
+            const resp = await fetch('/api/game');
+            const state = await resp.json();
+            
+            updatePhase(state.phase);
+            
+            const timer = document.getElementById('timer');
+            const info = document.getElementById('game-info');
+            
+            if (state.phase === 'running' && state.time_remaining > 0) {
+                const mins = Math.floor(state.time_remaining / 60);
+                const secs = state.time_remaining % 60;
+                timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                info.textContent = `${state.online_count} players online`;
+            } else if (state.phase === 'lobby') {
+                timer.textContent = '--:--';
+                info.textContent = `${state.ready_count}/${state.player_count} ready`;
+            } else if (state.phase === 'ended') {
+                timer.textContent = '00:00';
+                info.textContent = 'Game ended!';
+            } else {
+                timer.textContent = '--:--';
+                info.textContent = state.phase;
+            }
+        }
+        
+        async function loadLeaderboard() {
+            const resp = await fetch('/api/leaderboard');
+            const lb = await resp.json();
+            
+            const predDiv = document.getElementById('pred-lb');
+            const preyDiv = document.getElementById('prey-lb');
+            
+            predDiv.innerHTML = lb.preds.map((p, i) => `
+                <div class="lb-item">
+                    <div class="lb-rank rank-${i+1}">#${i+1}</div>
+                    <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
+                    <div class="lb-info">
+                        <div class="lb-name">
+                            <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
+                            ${p.name}
+                        </div>
+                        <div class="lb-stats">${p.captures} captures</div>
+                    </div>
+                    <div class="lb-points">${p.points}</div>
+                </div>
+            `).join('') || '<p style="color:#666">No predators</p>';
+            
+            preyDiv.innerHTML = lb.prey.map((p, i) => `
+                <div class="lb-item">
+                    <div class="lb-rank rank-${i+1}">#${i+1}</div>
+                    <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
+                    <div class="lb-info">
+                        <div class="lb-name">
+                            <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
+                            ${p.name}
+                        </div>
+                        <div class="lb-stats">${p.escapes} escapes, ${p.times_captured} caught</div>
+                    </div>
+                    <div class="lb-points">${p.points}</div>
+                </div>
+            `).join('') || '<p style="color:#666">No prey</p>';
+        }
+        
+        async function loadPlayers() {
+            const resp = await fetch('/api/players');
+            const players = await resp.json();
+            
+            const list = document.getElementById('players-list');
+            const targetSelect = document.getElementById('sighting-target');
+            
+            let html = '';
+            let targetOptions = '<option value="">Select target...</option>';
+            
+            for (const [id, p] of Object.entries(players)) {
+                if (p.role === 'unassigned') continue;
+                
+                html += `
+                    <div class="lb-item">
+                        <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
+                        <div class="lb-info">
+                            <div class="lb-name">
+                                <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
+                                ${p.name}
+                            </div>
+                            <div class="lb-stats">${p.role} | ${p.status}</div>
+                        </div>
+                    </div>
+                `;
+                
+                // Add to sighting targets (opposite role)
+                if (playerData.role === 'pred' && p.role === 'prey') {
+                    targetOptions += `<option value="${id}">${p.name} (${id})</option>`;
+                } else if (playerData.role === 'prey' && p.role === 'pred') {
+                    targetOptions += `<option value="${id}">${p.name} (${id})</option>`;
+                }
+            }
+            
+            list.innerHTML = html || '<p style="color:#666">No players</p>';
+            targetSelect.innerHTML = targetOptions;
+        }
+        
+        async function loadMessages() {
+            const resp = await fetch('/api/messages');
+            const msgs = await resp.json();
+            const container = document.getElementById('messages');
+            container.innerHTML = '';
+            msgs.forEach(addMessage);
+        }
+        
+        function addMessage(msg) {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = 'msg';
+            div.innerHTML = `
+                <div class="msg-header">
+                    <span class="msg-from">${msg.from_name}</span> to ${msg.to} • ${msg.time_str}
+                </div>
+                <div class="msg-content">${msg.message}</div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        async function sendMsg() {
+            const input = document.getElementById('msg-input');
+            const to = document.getElementById('msg-to').value;
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            await fetch('/api/messages', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({to, message})
+            });
+            
+            input.value = '';
+        }
+        
+        async function loadGallery() {
+            const resp = await fetch('/api/sightings');
+            const sightings = await resp.json();
+            
+            const gallery = document.getElementById('gallery');
+            if (sightings.length === 0) {
+                gallery.innerHTML = '<p style="color: #888; text-align: center; grid-column: 1/-1;">No photos yet</p>';
+            } else {
+                gallery.innerHTML = sightings.slice(0, 20).map(s => `
+                    <img src="${s.photo}" title="${s.spotter_name} spotted ${s.target_name}" onclick="window.open('${s.photo}')">
+                `).join('');
+            }
+        }
+        
+        function openSightingModal() {
+            document.getElementById('sighting-modal').classList.add('active');
+        }
+        
+        function closeSightingModal() {
+            document.getElementById('sighting-modal').classList.remove('active');
+            document.getElementById('sighting-preview').style.display = 'none';
+        }
+        
+        function previewSighting(input) {
+            if (input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const preview = document.getElementById('sighting-preview');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        async function submitSighting() {
+            const targetId = document.getElementById('sighting-target').value;
+            const photoInput = document.getElementById('sighting-photo');
+            
+            if (!targetId) {
+                notify('Select a target player', 'error');
+                return;
+            }
+            
+            if (!photoInput.files[0]) {
+                notify('Take or select a photo', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('target_id', targetId);
+            formData.append('photo', photoInput.files[0]);
+            
+            const resp = await fetch('/api/sighting', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (resp.ok) {
+                const data = await resp.json();
+                notify(`Sighting recorded! +${data.points} points`, 'success');
+                closeSightingModal();
+                loadGallery();
+            } else {
+                const data = await resp.json();
+                notify(data.error || 'Upload failed', 'error');
+            }
+        }
+        
+        async function triggerEmergency() {
+            if (confirm('Trigger EMERGENCY alert? This will notify all moderators.')) {
+                // TODO: implement emergency endpoint
+                notify('Emergency alert sent!', 'error');
+            }
+        }
+        
+        async function startGame() {
+            const duration = prompt('Game duration (minutes):', '30');
+            if (duration) {
+                await fetch('/api/game/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({duration: parseInt(duration), countdown: 10})
+                });
+            }
+        }
+        
+        async function pauseGame() {
+            await fetch('/api/game/pause', {method: 'POST'});
+        }
+        
+        async function endGame() {
+            if (confirm('End game now?')) {
+                await fetch('/api/game/end', {method: 'POST'});
+            }
+        }
+        
+        async function logout() {
+            await fetch('/api/logout', {method: 'POST'});
+            window.location.href = '/';
+        }
+        
+        // Initial load
+        loadGameState();
+        loadLeaderboard();
+        loadPlayers();
+        loadMessages();
+        loadGallery();
+        
+        // Periodic updates
+        setInterval(loadGameState, 3000);
+        setInterval(loadLeaderboard, 10000);
+        setInterval(loadPlayers, 10000);
+        
+        // Enter to send message
+        document.getElementById('msg-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMsg();
+        });
+    </script>
+</body>
+</html>
