@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-IRL Hunts - Game Server v3 (Production Ready)
+IRL Hunts - Game Server v4 (Complete Game Modes + Emergency System)
 Real-world predator vs prey game management system
 
-Fixes:
-- Admin can see all messages
-- API route consistency (beacons/safezones aliases)
-- Auto game end timer
-- Player offline detection
-- Rate limiting on captures
-- Proper error handling
-- Background tasks for timeouts
+Features:
+- 6 Game Modes: Classic Hunt, Quick Match, Endurance, Team Competition, Infection, Photo Safari
+- Emergency System with full player tracking
+- Mode-specific scoring and mechanics
+- Team management for Team Competition
+- Infection mode role conversion
+- Photo Safari capture requirements
 
 Run with: python app.py
 Access at: http://YOUR_IP:5000
@@ -25,6 +24,7 @@ import time
 import threading
 import os
 import uuid
+import random
 
 # =============================================================================
 # APP SETUP
@@ -53,15 +53,112 @@ CAPTURE_COOLDOWN = 10
 PLAYER_TIMEOUT = 30
 
 # =============================================================================
+# GAME MODES CONFIGURATION
+# =============================================================================
+
+GAME_MODES = {
+    "classic": {
+        "name": "Classic Hunt",
+        "description": "Standard 30-minute hunt with balanced scoring",
+        "duration": 30,
+        "capture_points": 100,
+        "escape_points": 75,
+        "sighting_points": 25,
+        "survival_bonus": 200,
+        "capture_bonus_3": 50,
+        "capture_bonus_5": 100,
+        "infection": False,
+        "photo_required": False,
+        "team_mode": False
+    },
+    "quick": {
+        "name": "Quick Match",
+        "description": "Fast-paced 15-minute game",
+        "duration": 15,
+        "capture_points": 100,
+        "escape_points": 75,
+        "sighting_points": 25,
+        "survival_bonus": 150,
+        "capture_bonus_3": 50,
+        "capture_bonus_5": 100,
+        "infection": False,
+        "photo_required": False,
+        "team_mode": False
+    },
+    "endurance": {
+        "name": "Endurance",
+        "description": "60-minute marathon with high survival bonus",
+        "duration": 60,
+        "capture_points": 100,
+        "escape_points": 75,
+        "sighting_points": 25,
+        "survival_bonus": 500,
+        "capture_bonus_3": 50,
+        "capture_bonus_5": 100,
+        "infection": False,
+        "photo_required": False,
+        "team_mode": False
+    },
+    "team": {
+        "name": "Team Competition",
+        "description": "Predators compete in teams for most captures",
+        "duration": 30,
+        "capture_points": 100,
+        "escape_points": 75,
+        "sighting_points": 25,
+        "survival_bonus": 200,
+        "capture_bonus_3": 50,
+        "capture_bonus_5": 100,
+        "infection": False,
+        "photo_required": False,
+        "team_mode": True,
+        "teams": ["Alpha", "Beta", "Gamma", "Delta"]
+    },
+    "infection": {
+        "name": "Infection Mode",
+        "description": "Captured prey become predators! Last survivor wins big",
+        "duration": 30,
+        "capture_points": 50,
+        "escape_points": 0,
+        "sighting_points": 25,
+        "survival_bonus": 1000,
+        "capture_bonus_3": 25,
+        "capture_bonus_5": 50,
+        "infection": True,
+        "photo_required": False,
+        "team_mode": False
+    },
+    "photo_safari": {
+        "name": "Photo Safari",
+        "description": "Must photograph prey before capture! Double photo points",
+        "duration": 30,
+        "capture_points": 100,
+        "escape_points": 75,
+        "sighting_points": 50,
+        "survival_bonus": 200,
+        "capture_bonus_3": 50,
+        "capture_bonus_5": 100,
+        "infection": False,
+        "photo_required": True,
+        "team_mode": False
+    }
+}
+
+# =============================================================================
 # GAME STATE
 # =============================================================================
 
 game = {
     "phase": "lobby",
+    "mode": "classic",
     "start_time": None,
     "end_time": None,
     "duration": 30,
     "countdown": 10,
+    "emergency": False,
+    "emergency_by": None,
+    "emergency_reason": "",
+    "emergency_time": None,
     "settings": {
         "honor_system": False,
         "capture_rssi": DEFAULT_CAPTURE_RSSI,
@@ -77,6 +174,7 @@ messages = []
 moderators = set()
 bounties = {}
 capture_cooldowns = {}
+team_scores = {"Alpha": 0, "Beta": 0, "Gamma": 0, "Delta": 0}
 event_counter = 0
 background_thread_stop = False
 
@@ -89,6 +187,9 @@ def now():
 
 def now_str():
     return datetime.now().strftime("%H:%M:%S")
+
+def get_mode_config():
+    return GAME_MODES.get(game["mode"], GAME_MODES["classic"])
 
 def log_event(event_type, data, broadcast=True):
     global event_counter
@@ -116,10 +217,12 @@ def get_player(device_id):
             "name": f"Player_{device_id[-4:]}",
             "profile_pic": None,
             "role": "unassigned",
+            "original_role": "unassigned",
             "status": "offline",
             "online": False,
             "in_safe_zone": False,
             "safe_zone_beacon": None,
+            "team": None,
             "captures": 0,
             "escapes": 0,
             "times_captured": 0,
@@ -128,8 +231,12 @@ def get_player(device_id):
             "last_seen": now(),
             "last_ping": time.time(),
             "last_rssi": {},
+            "last_location_hint": "",
+            "nearby_players": [],
             "notifications": [],
-            "captured_by": None
+            "captured_by": None,
+            "has_photo_of": [],
+            "infections": 0
         }
         log_event("player_join", {"id": device_id, "name": f"Player_{device_id[-4:]}"})
     return players[device_id]
@@ -151,19 +258,28 @@ def notify_all_players(message, msg_type="info"):
     socketio.emit("notification", notif, room="all")
 
 def calculate_points(player):
+    mode_config = get_mode_config()
     pts = 0
+    
     if player["role"] == "pred":
-        pts += player["captures"] * 100
+        pts += player["captures"] * mode_config["capture_points"]
         if player["captures"] >= 3:
-            pts += 50
+            pts += mode_config["capture_bonus_3"]
         if player["captures"] >= 5:
-            pts += 100
-        pts += player["sightings"] * SIGHTING_POINTS
+            pts += mode_config["capture_bonus_5"]
+        pts += player["sightings"] * mode_config["sighting_points"]
+        if mode_config["infection"]:
+            pts += player.get("infections", 0) * 25
     elif player["role"] == "prey":
-        pts += player["escapes"] * 75
-        pts += player["sightings"] * SIGHTING_POINTS
+        pts += player["escapes"] * mode_config["escape_points"]
+        pts += player["sightings"] * mode_config["sighting_points"]
         if player["times_captured"] == 0 and game["phase"] == "ended":
-            pts += 200
+            pts += mode_config["survival_bonus"]
+        if mode_config["infection"] and game["phase"] == "ended":
+            prey_count = len([p for p in players.values() if p["role"] == "prey"])
+            if prey_count == 1 and player["role"] == "prey":
+                pts += mode_config["survival_bonus"]
+    
     player["points"] = pts
     return pts
 
@@ -184,7 +300,9 @@ def get_leaderboard():
             "sightings": p["sightings"],
             "status": p["status"],
             "online": p["online"],
-            "in_safe_zone": p["in_safe_zone"]
+            "in_safe_zone": p["in_safe_zone"],
+            "team": p.get("team"),
+            "infections": p.get("infections", 0)
         }
         if p["role"] == "pred":
             preds.append(entry)
@@ -192,9 +310,29 @@ def get_leaderboard():
             prey.append(entry)
     preds.sort(key=lambda x: x["points"], reverse=True)
     prey.sort(key=lambda x: x["points"], reverse=True)
-    return {"preds": preds, "prey": prey}
+    
+    teams = {}
+    if get_mode_config()["team_mode"]:
+        teams = dict(team_scores)
+    
+    return {"preds": preds, "prey": prey, "teams": teams}
+
+def assign_team(player):
+    mode_config = get_mode_config()
+    if not mode_config["team_mode"] or player["role"] != "pred":
+        return
+    
+    team_sizes = {team: 0 for team in mode_config["teams"]}
+    for p in players.values():
+        if p["role"] == "pred" and p.get("team") in team_sizes:
+            team_sizes[p["team"]] += 1
+    
+    smallest_team = min(team_sizes, key=team_sizes.get)
+    player["team"] = smallest_team
+    notify_player(player["device_id"], f"You've been assigned to Team {smallest_team}!", "info")
 
 def process_capture(pred_id, prey_id, rssi):
+    mode_config = get_mode_config()
     pred = players.get(pred_id)
     prey_p = players.get(prey_id)
     
@@ -204,14 +342,20 @@ def process_capture(pred_id, prey_id, rssi):
         return False, "Not a predator"
     if prey_p["role"] != "prey":
         return False, "Target is not prey"
-    if prey_p["status"] == "captured":
+    if prey_p["status"] == "captured" and not mode_config["infection"]:
         return False, "Already captured"
-    if prey_p["in_safe_zone"]:
+    if prey_p["in_safe_zone"] and not mode_config["infection"]:
         return False, "Prey is in safe zone"
     if game["phase"] != "running":
         return False, "Game not running"
+    if game["emergency"]:
+        return False, "Game paused for emergency"
     if rssi < game["settings"]["capture_rssi"]:
         return False, f"Too far (RSSI: {rssi}, need > {game['settings']['capture_rssi']})"
+    
+    if mode_config["photo_required"]:
+        if prey_id not in pred.get("has_photo_of", []):
+            return False, "Must photograph prey first! Take a sighting photo before capture."
     
     current_time = time.time()
     if pred_id in capture_cooldowns:
@@ -220,19 +364,51 @@ def process_capture(pred_id, prey_id, rssi):
             return False, f"Wait {int(CAPTURE_COOLDOWN - time_since_last)}s"
     
     capture_cooldowns[pred_id] = current_time
+    
+    if mode_config["infection"]:
+        prey_p["role"] = "pred"
+        prey_p["status"] = "active"
+        prey_p["times_captured"] += 1
+        pred["captures"] += 1
+        pred["infections"] = pred.get("infections", 0) + 1
+        
+        log_event("infection", {"pred": pred["name"], "prey": prey_p["name"], "rssi": rssi})
+        notify_player(prey_id, f"INFECTED by {pred['name']}! You are now a PREDATOR!", "danger")
+        notify_player(pred_id, f"You infected {prey_p['name']}! They're now hunting!", "success")
+        notify_all_players(f"🦠 {prey_p['name']} has been INFECTED!", "warning")
+        socketio.emit("infection", {"pred": pred["name"], "prey": prey_p["name"]}, room="all")
+        
+        prey_left = len([p for p in players.values() if p["role"] == "prey" and p["status"] != "captured"])
+        if prey_left == 0:
+            game["phase"] = "ended"
+            game["end_time"] = now()
+            log_event("game_auto_end", {"reason": "All prey infected!"})
+            notify_all_players("🦠 ALL PREY INFECTED! Game Over!", "info")
+            socketio.emit("game_ended", get_leaderboard(), room="all")
+        
+        return True, f"Infected {prey_p['name']}! They're now a predator!"
+    
     prey_p["status"] = "captured"
     prey_p["times_captured"] += 1
     prey_p["captured_by"] = pred["name"]
     pred["captures"] += 1
     
-    log_event("capture", {"pred": pred["name"], "prey": prey_p["name"], "rssi": rssi})
+    if mode_config["team_mode"] and pred.get("team"):
+        team_scores[pred["team"]] = team_scores.get(pred["team"], 0) + 1
+    
+    log_event("capture", {"pred": pred["name"], "prey": prey_p["name"], "rssi": rssi, "team": pred.get("team")})
     notify_player(prey_id, f"CAPTURED by {pred['name']}!", "danger")
     notify_player(pred_id, f"You captured {prey_p['name']}!", "success")
-    socketio.emit("capture", {"pred": pred["name"], "prey": prey_p["name"]}, room="all")
+    socketio.emit("capture", {"pred": pred["name"], "prey": prey_p["name"], "team": pred.get("team")}, room="all")
     
     return True, f"Captured {prey_p['name']}!"
 
 def process_escape(prey_id, beacon_id=None):
+    mode_config = get_mode_config()
+    
+    if mode_config["infection"]:
+        return False
+    
     prey_p = players.get(prey_id)
     if not prey_p or prey_p["status"] != "captured":
         return False
@@ -269,6 +445,7 @@ def update_safe_zone(device_id, beacon_rssi):
         player["in_safe_zone"] = True
         player["safe_zone_beacon"] = nearest_beacon
         beacon_name = beacons[nearest_beacon].get("name", nearest_beacon)
+        player["last_location_hint"] = f"Near {beacon_name}"
         log_event("enter_safezone", {"player": player["name"], "beacon": beacon_name})
         notify_player(device_id, f"Entered safe zone: {beacon_name}", "success")
         if player["status"] == "captured":
@@ -279,6 +456,60 @@ def update_safe_zone(device_id, beacon_rssi):
         log_event("leave_safezone", {"player": player["name"]})
         notify_player(device_id, "Left safe zone - you can be captured!", "warning")
 
+def trigger_emergency(device_id, reason=""):
+    player = players.get(device_id)
+    if not player:
+        return False, "Player not found"
+    
+    game["emergency"] = True
+    game["emergency_by"] = player["name"]
+    game["emergency_reason"] = reason
+    game["emergency_time"] = now()
+    
+    if game["phase"] == "running":
+        game["phase"] = "paused"
+    
+    nearest_players = []
+    for pid, p in players.items():
+        if pid != device_id and p["online"]:
+            if device_id in p.get("last_rssi", {}):
+                rssi = p["last_rssi"][device_id]
+                nearest_players.append({"name": p["name"], "device_id": pid, "rssi": rssi})
+    
+    nearest_players.sort(key=lambda x: x["rssi"], reverse=True)
+    
+    emergency_data = {
+        "player_name": player["name"],
+        "device_id": device_id,
+        "reason": reason,
+        "location_hint": player.get("last_location_hint", "Unknown"),
+        "nearby_players": player.get("nearby_players", []),
+        "nearest_to_emergency": nearest_players[:5],
+        "time": now_str()
+    }
+    
+    log_event("emergency_triggered", emergency_data)
+    
+    emergency_msg = f"🚨 EMERGENCY! {player['name']} needs help! Location: {player.get('last_location_hint', 'Unknown')}"
+    notify_all_players(emergency_msg, "danger")
+    
+    socketio.emit("emergency_alert", emergency_data, room="all")
+    
+    return True, "Emergency triggered"
+
+def clear_emergency():
+    game["emergency"] = False
+    old_by = game["emergency_by"]
+    game["emergency_by"] = None
+    game["emergency_reason"] = ""
+    game["emergency_time"] = None
+    
+    log_event("emergency_cleared", {"was_by": old_by})
+    notify_all_players("✅ Emergency cleared. Game can resume.", "success")
+    socketio.emit("emergency_cleared", {}, room="all")
+    
+    return True
+
 def check_player_timeouts():
     current_time = time.time()
     for device_id, player in players.items():
@@ -288,7 +519,7 @@ def check_player_timeouts():
                 player["online"] = False
 
 def check_game_end():
-    if game["phase"] == "running" and game["end_time"]:
+    if game["phase"] == "running" and game["end_time"] and not game["emergency"]:
         end_dt = datetime.fromisoformat(game["end_time"])
         if datetime.now() >= end_dt:
             game["phase"] = "ended"
@@ -355,12 +586,14 @@ def dashboard():
     device_id = session["device_id"]
     player = get_player(device_id)
     is_mod = device_id in moderators or session.get("is_admin", False)
-    return render_template("dashboard.html", player=player, is_mod=is_mod)
+    mode_config = get_mode_config()
+    return render_template("dashboard.html", player=player, is_mod=is_mod, 
+                          mode_config=mode_config, game_mode=game["mode"])
 
 @app.route("/admin")
 @admin_required
 def admin():
-    return render_template("admin.html")
+    return render_template("admin.html", game_modes=GAME_MODES)
 
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
@@ -448,8 +681,10 @@ def api_update_player():
         if can_change:
             old_role = player["role"]
             player["role"] = data["role"]
+            player["original_role"] = data["role"]
             if old_role != data["role"]:
                 log_event("role_change", {"player": player["name"], "from": old_role, "to": data["role"]})
+                assign_team(player)
         else:
             return jsonify({"error": "Must be in safe zone to change role"}), 400
     
@@ -511,6 +746,60 @@ def api_get_notifications():
     return jsonify(notifs)
 
 # =============================================================================
+# EMERGENCY API
+# =============================================================================
+
+@app.route("/api/emergency", methods=["POST"])
+@login_required
+def api_trigger_emergency():
+    device_id = session["device_id"]
+    if device_id == "ADMIN":
+        return jsonify({"error": "Admin cannot trigger emergency"}), 400
+    
+    data = request.json or {}
+    reason = str(data.get("reason", "Emergency button pressed"))[:200]
+    
+    success, msg = trigger_emergency(device_id, reason)
+    if success:
+        return jsonify({"success": True, "message": msg})
+    return jsonify({"error": msg}), 400
+
+@app.route("/api/emergency/clear", methods=["POST"])
+@mod_required
+def api_clear_emergency():
+    clear_emergency()
+    return jsonify({"success": True})
+
+@app.route("/api/emergency/status", methods=["GET"])
+def api_emergency_status():
+    if not game["emergency"]:
+        return jsonify({"emergency": False})
+    
+    emergency_player = None
+    for p in players.values():
+        if p["name"] == game["emergency_by"]:
+            emergency_player = p
+            break
+    
+    nearest = []
+    if emergency_player:
+        for pid, p in players.items():
+            if p["device_id"] != emergency_player["device_id"] and p["online"]:
+                if emergency_player["device_id"] in p.get("last_rssi", {}):
+                    rssi = p["last_rssi"][emergency_player["device_id"]]
+                    nearest.append({"name": p["name"], "rssi": rssi})
+        nearest.sort(key=lambda x: x["rssi"], reverse=True)
+    
+    return jsonify({
+        "emergency": True,
+        "by": game["emergency_by"],
+        "reason": game["emergency_reason"],
+        "time": game["emergency_time"],
+        "location_hint": emergency_player.get("last_location_hint", "Unknown") if emergency_player else "Unknown",
+        "nearest_players": nearest[:10]
+    })
+
+# =============================================================================
 # SIGHTING API
 # =============================================================================
 
@@ -522,8 +811,13 @@ def api_upload_sighting():
         return jsonify({"error": "Admin cannot upload sightings"}), 400
     
     player = get_player(device_id)
+    mode_config = get_mode_config()
+    
     if game["phase"] != "running":
         return jsonify({"error": "Game not running"}), 400
+    
+    if game["emergency"]:
+        return jsonify({"error": "Game paused for emergency"}), 400
     
     target_id = request.form.get("target_id", "").upper()
     if target_id not in players:
@@ -550,13 +844,21 @@ def api_upload_sighting():
     photo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     
     player["sightings"] += 1
+    
+    if mode_config["photo_required"] and player["role"] == "pred":
+        if target_id not in player.get("has_photo_of", []):
+            player["has_photo_of"].append(target_id)
+            notify_player(device_id, f"✅ You can now capture {target['name']}!", "success")
+    
+    sighting_points = mode_config["sighting_points"]
+    
     log_event("sighting", {
         "spotter": player["name"],
         "target": target["name"],
         "photo": f"/uploads/{filename}"
     })
     
-    notify_player(device_id, f"Sighting recorded! +{SIGHTING_POINTS} pts", "success")
+    notify_player(device_id, f"Sighting recorded! +{sighting_points} pts", "success")
     notify_player(target_id, f"You were spotted by {player['name']}!", "warning")
     socketio.emit("sighting", {
         "spotter": player["name"],
@@ -564,7 +866,7 @@ def api_upload_sighting():
         "photo": f"/uploads/{filename}"
     }, room="all")
     
-    return jsonify({"success": True, "points": SIGHTING_POINTS})
+    return jsonify({"success": True, "points": sighting_points})
 
 @app.route("/api/sightings", methods=["GET"])
 def api_get_sightings():
@@ -601,20 +903,41 @@ def api_tracker_ping():
     
     if "player_rssi" in data:
         player["last_rssi"] = data["player_rssi"]
+        nearby = []
+        for pid, rssi in data["player_rssi"].items():
+            if pid in players:
+                nearby.append({"id": pid, "name": players[pid]["name"], "rssi": rssi})
+        nearby.sort(key=lambda x: x["rssi"], reverse=True)
+        player["nearby_players"] = nearby[:5]
+        
+        if nearby:
+            player["last_location_hint"] = f"Near {nearby[0]['name']} ({nearby[0]['rssi']}dB)"
+    
     if "beacon_rssi" in data:
         update_safe_zone(device_id, data["beacon_rssi"])
     
     notifs = player.get("notifications", [])[-5:]
     player["notifications"] = []
     
+    mode_config = get_mode_config()
+    
     return jsonify({
         "phase": game["phase"],
         "status": player["status"],
         "role": player["role"],
+        "name": player["name"],
         "in_safe_zone": player["in_safe_zone"],
+        "team": player.get("team"),
         "notifications": notifs,
         "settings": game["settings"],
-        "beacons": list(beacons.keys())
+        "beacons": list(beacons.keys()),
+        "game_mode": game["mode"],
+        "game_mode_name": mode_config["name"],
+        "emergency": game["emergency"],
+        "emergency_by": game["emergency_by"],
+        "infection_mode": mode_config["infection"],
+        "photo_required": mode_config["photo_required"],
+        "has_photo_of": player.get("has_photo_of", [])
     })
 
 @app.route("/api/tracker/capture", methods=["POST"])
@@ -626,8 +949,20 @@ def api_tracker_capture():
     success, msg = process_capture(pred_id, prey_id, rssi)
     return jsonify({"success": success, "message": msg})
 
+@app.route("/api/tracker/emergency", methods=["POST"])
+def api_tracker_emergency():
+    data = request.json or {}
+    device_id = data.get("device_id", "").strip().upper()
+    reason = data.get("reason", "Emergency triggered from tracker")
+    
+    if not device_id or device_id not in players:
+        return jsonify({"error": "Invalid device"}), 400
+    
+    success, msg = trigger_emergency(device_id, reason)
+    return jsonify({"success": success, "message": msg})
+
 # =============================================================================
-# BEACON API (with safezones aliases)
+# BEACON API
 # =============================================================================
 
 @app.route("/api/beacons", methods=["GET"])
@@ -697,21 +1032,62 @@ def api_delete_beacon(beacon_id):
 
 @app.route("/api/game", methods=["GET"])
 def api_get_game():
+    mode_config = get_mode_config()
     state = game.copy()
+    state["mode_config"] = mode_config
+    state["mode_name"] = mode_config["name"]
     state["player_count"] = len([p for p in players.values() if p["role"] != "unassigned"])
     state["pred_count"] = len([p for p in players.values() if p["role"] == "pred"])
     state["prey_count"] = len([p for p in players.values() if p["role"] == "prey"])
     state["ready_count"] = len([p for p in players.values() if p["status"] == "ready"])
     state["online_count"] = len([p for p in players.values() if p["online"]])
     state["captured_count"] = len([p for p in players.values() if p["status"] == "captured"])
+    state["team_scores"] = team_scores
     
-    if state["phase"] == "running" and state["end_time"]:
+    if state["phase"] == "running" and state["end_time"] and not state["emergency"]:
         remaining = (datetime.fromisoformat(state["end_time"]) - datetime.now()).total_seconds()
         state["time_remaining"] = max(0, int(remaining))
     else:
         state["time_remaining"] = 0
     
     return jsonify(state)
+
+@app.route("/api/game/modes", methods=["GET"])
+def api_get_game_modes():
+    return jsonify(GAME_MODES)
+
+@app.route("/api/game/mode", methods=["PUT"])
+@admin_required
+def api_set_game_mode():
+    if game["phase"] != "lobby":
+        return jsonify({"error": "Can only change mode in lobby"}), 400
+    
+    data = request.json or {}
+    mode = data.get("mode", "classic")
+    
+    if mode not in GAME_MODES:
+        return jsonify({"error": "Invalid game mode"}), 400
+    
+    game["mode"] = mode
+    mode_config = GAME_MODES[mode]
+    game["duration"] = mode_config["duration"]
+    
+    if mode_config["team_mode"]:
+        for p in players.values():
+            if p["role"] == "pred":
+                assign_team(p)
+    else:
+        for p in players.values():
+            p["team"] = None
+    
+    for team in team_scores:
+        team_scores[team] = 0
+    
+    log_event("mode_change", {"mode": mode, "name": mode_config["name"]})
+    notify_all_players(f"Game mode set to: {mode_config['name']}", "info")
+    socketio.emit("mode_change", {"mode": mode, "config": mode_config}, room="all")
+    
+    return jsonify({"success": True, "mode": mode, "config": mode_config})
 
 @app.route("/api/game/settings", methods=["PUT"])
 @admin_required
@@ -729,6 +1105,9 @@ def api_start_game():
     if game["phase"] != "lobby":
         return jsonify({"error": "Not in lobby"}), 400
     
+    if game["emergency"]:
+        return jsonify({"error": "Cannot start game during emergency"}), 400
+    
     pred_count = len([p for p in players.values() if p["role"] == "pred" and p["status"] == "ready"])
     prey_count = len([p for p in players.values() if p["role"] == "prey" and p["status"] == "ready"])
     
@@ -737,18 +1116,28 @@ def api_start_game():
     if prey_count == 0:
         return jsonify({"error": "Need at least one ready prey"}), 400
     
+    mode_config = get_mode_config()
     data = request.json or {}
-    game["duration"] = min(max(data.get("duration", 30), 5), 180)
+    game["duration"] = min(max(data.get("duration", mode_config["duration"]), 5), 180)
     game["countdown"] = min(max(data.get("countdown", 10), 5), 60)
     game["phase"] = "countdown"
+    
+    if mode_config["photo_required"]:
+        for p in players.values():
+            p["has_photo_of"] = []
     
     for p in players.values():
         if p["status"] == "ready" and p["role"] != "unassigned":
             p["status"] = "active"
     
-    log_event("game_start", {"duration": game["duration"], "countdown": game["countdown"]})
-    notify_all_players(f"Game starting in {game['countdown']} seconds!", "warning")
-    socketio.emit("game_starting", {"countdown": game["countdown"]}, room="all")
+    log_event("game_start", {
+        "duration": game["duration"], 
+        "countdown": game["countdown"],
+        "mode": game["mode"],
+        "mode_name": mode_config["name"]
+    })
+    notify_all_players(f"{mode_config['name']} starting in {game['countdown']} seconds!", "warning")
+    socketio.emit("game_starting", {"countdown": game["countdown"], "mode": game["mode"]}, room="all")
     
     def start_after_countdown():
         time.sleep(game["countdown"])
@@ -756,9 +1145,9 @@ def api_start_game():
             game["phase"] = "running"
             game["start_time"] = now()
             game["end_time"] = (datetime.now() + timedelta(minutes=game["duration"])).isoformat()
-            log_event("game_running", {"duration": game["duration"]})
-            notify_all_players("GAME STARTED! Good luck!", "success")
-            socketio.emit("game_started", {}, room="all")
+            log_event("game_running", {"duration": game["duration"], "mode": game["mode"]})
+            notify_all_players(f"🎮 {mode_config['name']} STARTED! Good luck!", "success")
+            socketio.emit("game_started", {"mode": game["mode"]}, room="all")
     
     threading.Thread(target=start_after_countdown, daemon=True).start()
     return jsonify({"success": True})
@@ -776,6 +1165,9 @@ def api_pause_game():
 @app.route("/api/game/resume", methods=["POST"])
 @mod_required
 def api_resume_game():
+    if game["emergency"]:
+        return jsonify({"error": "Cannot resume during emergency. Clear emergency first."}), 400
+    
     if game["phase"] == "paused":
         game["phase"] = "running"
         log_event("game_resume", {})
@@ -798,11 +1190,19 @@ def api_end_game():
 @admin_required
 def api_reset_game():
     game["phase"] = "lobby"
+    game["mode"] = "classic"
     game["start_time"] = None
     game["end_time"] = None
+    game["emergency"] = False
+    game["emergency_by"] = None
+    game["emergency_reason"] = ""
+    game["emergency_time"] = None
     
     for p in players.values():
         p["status"] = "lobby" if p["online"] else "offline"
+        p["role"] = "unassigned"
+        p["original_role"] = "unassigned"
+        p["team"] = None
         p["captures"] = 0
         p["escapes"] = 0
         p["times_captured"] = 0
@@ -810,6 +1210,11 @@ def api_reset_game():
         p["points"] = 0
         p["in_safe_zone"] = False
         p["captured_by"] = None
+        p["has_photo_of"] = []
+        p["infections"] = 0
+    
+    for team in team_scores:
+        team_scores[team] = 0
     
     capture_cooldowns.clear()
     log_event("game_reset", {})
@@ -835,7 +1240,6 @@ def api_get_leaderboard():
 def api_get_messages():
     device_id = session["device_id"]
     
-    # Admin sees ALL messages
     if session.get("is_admin"):
         return jsonify(messages[-100:])
     
@@ -977,10 +1381,12 @@ def ws_heartbeat():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("  🎯 IRL Hunts Game Server v3")
+    print("  🎯 IRL Hunts Game Server v4")
+    print("  Complete Game Modes + Emergency System")
     print("=" * 60)
     print(f"  Admin Password: {ADMIN_PASSWORD}")
     print(f"  Server URL: http://0.0.0.0:5000")
+    print(f"  Available Modes: {', '.join(GAME_MODES.keys())}")
     print("=" * 60)
     
     start_background_thread()
