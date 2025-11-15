@@ -1,6 +1,6 @@
-# 🎮 IRL Hunts - Gameplay Guide
+# 🎮 IRL Hunts - Complete Gameplay Guide
 
-Master the hunt with this comprehensive guide to rules, strategies, and scoring.
+Master the hunt with this comprehensive guide to game modes, rules, strategies, and safety systems.
 
 ---
 
@@ -10,466 +10,551 @@ IRL Hunts is a real-world game of cat and mouse. **Predators** hunt **Prey** usi
 
 ---
 
-## 🦊 Playing as Predator
+## 🎯 Game Modes
 
-### Your Mission
-Track down and capture prey by getting physically close enough to trigger a capture.
+### Classic Hunt (Default)
+**Duration:** 30 minutes | **Recommended for:** First-time players, balanced gameplay
 
-### How Captures Work
-1. Your tracker detects nearby prey via LoRa signal
-2. OLED shows signal strength (RSSI) and player ID
-3. Get close enough (RSSI meets threshold)
-4. Press button to attempt capture
-5. Server validates and confirms capture
+The standard IRL Hunts experience with balanced scoring and mechanics.
 
-### RSSI Signal Guide
-```
--30 to -50: VERY CLOSE (1-2m) ✅ Easy capture
--50 to -60: CLOSE (2-5m) ✅ Good capture range
--60 to -70: MEDIUM (5-10m) ⚠️ Might work
--70 to -80: FAR (10-20m) ❌ Too far
--80 to -90: VERY FAR (20m+) ❌ Out of range
-```
-
-**Note**: Obstacles (walls, trees) weaken signals significantly.
-
-### Scoring
+**Scoring:**
 | Action | Points |
 |--------|--------|
-| Each capture | +100 |
+| Capture (pred) | +100 |
 | 3+ captures bonus | +50 |
 | 5+ captures bonus | +100 |
-| Photo sighting | +25 |
-| Bounty capture | Variable |
-
-### Predator Strategies
-
-**Lone Wolf**
-- Hunt solo for maximum captures
-- Move quickly between areas
-- Surprise prey in hiding spots
-
-**Pack Hunter**
-- Coordinate with other predators
-- Flush prey toward teammates
-- Cover more ground
-
-**Stalker**
-- Follow prey from distance
-- Wait for them to leave safe zones
-- Strike when vulnerable
-
-**Trap Setter**
-- Position between prey and safe zones
-- Predict prey movements
-- Cut off escape routes
-
-### Photo Sightings
-- Take photos of prey for +25 points
-- Upload via web dashboard
-- Proves you found them
-- Useful for near-misses
-
-### Tips for Predators
-- Watch for prey leaving safe zones
-- Communicate prey locations with team
-- Don't tunnel vision on one target
-- Check all hiding spots
-- Use terrain to your advantage
-- Photos are backup points if capture fails
-
----
-
-## 🐰 Playing as Prey
-
-### Your Mission
-Survive the game without being captured, and escape when you are caught.
-
-### How to Avoid Capture
-- Monitor tracker for predator warnings
-- Stay mobile - don't camp
-- Use safe zones strategically
-- Work with other prey
-- Watch RSSI signals for approaching preds
-
-### Safe Zones
-Physical locations with beacon devices:
-- Auto-detected by your tracker
-- Can't be captured while inside
-- Captured prey auto-escape on entry
-- Limited time recommended (avoid camping)
-
-**Safe Zone Notifications:**
-- "Entered safe zone: [Name]" ✅
-- "Left safe zone - you can be captured!" ⚠️
-- "YOU ESCAPED!" (if captured) 🎉
-
-### Scoring
-| Action | Points |
-|--------|--------|
-| Each escape | +75 |
+| Escape (prey) | +75 |
 | Photo sighting | +25 |
 | Survival bonus (never caught) | +200 |
 
-### Prey Strategies
-
-**Runner**
-- Constant movement
-- Use speed to stay ahead
-- Never stay in one place
-
-**Hider**
-- Find obscure hiding spots
-- Minimize LoRa transmission distance
-- Stay quiet and hidden
-
-**Safe Zone Hopper**
-- Move between safe zones
-- Never stray far from safety
-- Quick dashes between zones
-
-**Counter-Intel**
-- Photograph predators approaching
-- Warn other prey via chat
-- Share predator locations
-
-**Decoy**
-- Distract predators
-- Lead them away from other prey
-- Sacrifice for team points
-
-### Escaping After Capture
-1. Status shows "CAPTURED"
-2. Head to nearest safe zone beacon
-3. Enter beacon range
-4. Auto-escape triggers
-5. You're free again!
-
-### Tips for Prey
-- Know all safe zone locations before game
-- Don't panic when captured - escape is possible
-- Team chat for pred locations
-- Photos of preds help your team
-- Mix up your patterns
-- Walls/buildings block LoRa signals
-- Stay unpredictable
+**Key Features:**
+- Standard capture mechanics
+- Safe zones enable escapes
+- Balanced point distribution
+- Individual player rankings
 
 ---
-
-## 🏠 Safe Zone Mechanics
-
-### Detection
-- Beacon broadcasts LoRa signal
-- Your tracker detects signal strength
-- Exceeds RSSI threshold = you're in
-- Automatic - no button press needed
-
-### Rules
-✅ **Allowed:**
-- Enter/exit freely
-- Change roles (if enabled)
-- Chat with team
-- Take photos
-
-❌ **Not Allowed:**
-- Being captured
-- Camping indefinitely (frowned upon)
-- Blocking safe zone entrance
-
-### Strategic Use
-- Quick refuge when predator close
-- Escape after capture
-- Role change location
-- Rally point for prey team
-
----
-
-## 📸 Photo Sightings
-
-### How It Works
-1. Open dashboard on phone
-2. Click 📷 floating button
-3. Select target player from list
-4. Take/upload photo
-5. Submit for points
-
-### Rules
-- Predators photograph prey only
-- Prey photograph predators only
-- Photo should show the target
-- Game must be running
-- +25 points per sighting
-
-### Why Bother?
-- Backup points if capture fails
-- Proof you found someone
-- Teamwide intel (gallery visible)
-- Fun memory of the game
-
----
-
-## 💬 Team Communication
-
-### Chat Types
-- **All**: Everyone sees
-- **Team**: Only your role sees
-
-### Strategic Uses
-- Share predator locations (prey)
-- Coordinate captures (pred)
-- Warn of approaching threats
-- Plan group strategies
-- Celebrate captures/escapes
-
-### Sample Calls
-**Prey:**
-```
-"Pred near Building A, heading east"
-"Safe zone Oak Tree clear, come here"
-"I'm captured, going for escape at fountain"
-```
-
-**Predators:**
-```
-"Two prey near parking lot"
-"I'll flank left, you go right"
-"Target escaping toward safe zone"
-```
-
----
-
-## 🏆 Scoring System
-
-### Predator Total
-```
-Base captures × 100
-+ Capture bonus (3+) × 50
-+ Capture bonus (5+) × 100
-+ Photo sightings × 25
-+ Bounty bonuses
-= Total Points
-```
-
-### Prey Total
-```
-Escapes × 75
-+ Photo sightings × 25
-+ Survival bonus (if uncaught) × 200
-+ Bounty bonuses
-= Total Points
-```
-
-### Leaderboards
-- Separate for Preds and Prey
-- Real-time updates
-- Shows profile pics
-- Displays online status
-- Safe zone indicator
-
----
-
-## 🎯 Special Mechanics
-
-### Bounties
-- Admin/mods set bounties on players
-- Extra points for that target
-- Creates focus on specific player
-- Notification to target ("You have a bounty!")
-
-### Emergency Button
-- Press if real emergency
-- Alerts all moderators
-- For actual safety concerns
-- Not for game purposes
-
-### Moderator Powers
-- Start/pause/end game
-- Release captured players
-- Kick problematic players
-- Set bounties
-- Send announcements
-
----
-
-## 🎲 Game Variations
-
-### Classic Hunt (Recommended)
-- 1-3 predators
-- 5-10 prey
-- 30 minutes
-- Most points wins
 
 ### Quick Match
-- 10-15 minutes
-- Fewer players
-- Fast-paced action
+**Duration:** 10-15 minutes | **Recommended for:** Short breaks, tournaments, warm-ups
 
-### Endurance
-- 60+ minutes
-- Tests stamina
-- Strategic planning
+Fast-paced action with slightly modified survival bonuses.
 
-### Team Competition
-- Teams of preds compete
-- Most captures for team wins
-- Coordination crucial
+**Scoring:**
+| Action | Points |
+|--------|--------|
+| Capture (pred) | +100 |
+| 3+ captures bonus | +50 |
+| 5+ captures bonus | +100 |
+| Escape (prey) | +75 |
+| Photo sighting | +25 |
+| Survival bonus | +150 |
 
-### Infection Mode
-- Start with 1-2 preds
-- Captured prey become preds
-- Last prey standing wins big
-
-### Photo Safari
-- Double sighting points (50)
-- Photos required for captures
-- Document everything
+**Strategy Tips:**
+- Aggressive play rewarded
+- Less time for complex strategies
+- Quick decisions matter
+- Predators should hunt immediately
 
 ---
 
-## ⚠️ Safety Rules
+### Endurance Mode
+**Duration:** 60+ minutes | **Recommended for:** Experienced players, stamina tests
+
+Long-form gameplay that rewards strategic thinking and endurance.
+
+**Scoring:**
+| Action | Points |
+|--------|--------|
+| Capture (pred) | +100 |
+| 3+ captures bonus | +50 |
+| 5+ captures bonus | +100 |
+| Escape (prey) | +75 |
+| Photo sighting | +25 |
+| Survival bonus | +500 |
+
+**Strategy Tips:**
+- Pace yourself physically
+- Prey: hiding becomes more valuable
+- Predators: systematic sweeps
+- Resource management (battery, hydration)
+- Strategic safe zone rotation
+
+---
+
+### Team Competition
+**Duration:** Variable | **Recommended for:** Large groups, team building events
+
+Predators compete in teams; team with most captures wins.
+
+**Team Structure:**
+- Predators auto-assigned to teams (Alpha, Beta, Gamma, etc.)
+- Teams balanced by admin
+- Team chat enabled
+- Individual and team scores tracked
+
+**Scoring:**
+| Action | Points |
+|--------|--------|
+| Team capture total | Compared |
+| Individual captures | +100 each |
+| Photo sightings | +25 |
+| Winning team bonus | +300 per member |
+
+**Strategy Tips:**
+- Communication is crucial
+- Coordinate hunting zones
+- Share prey locations
+- Avoid duplicate targets
+- Flanking maneuvers
+
+---
+
+### ⚠️ Infection Mode (Special Mechanics)
+**Duration:** Variable | **Recommended for:** Exciting endgame scenarios, larger groups
+
+Captured prey become predators! The infection spreads until all prey are converted.
+
+**Critical Rule Changes:**
+- ❌ NO ESCAPING - once infected, you're permanently a predator
+- 🦠 Captured prey IMMEDIATELY become hunters
+- 🎯 Game ends when ALL prey are infected OR timer expires
+- 👑 Last survivor gets massive bonus
+
+**Scoring:**
+| Action | Points |
+|--------|--------|
+| Infection (capture) | +50 |
+| Last survivor bonus | +1000 |
+| Time survived (per minute) | +10 |
+
+**Tracker Display Shows:**
+- "PREDATOR (Infector)" or "PREY (Survivor)"
+- Number of remaining prey
+- "INFECTED!" notification on capture
+
+**Strategy for Prey:**
+- Form alliances with other prey
+- Share predator locations constantly
+- Move in unpredictable patterns
+- Avoid being isolated
+- Know that friends may become enemies
+
+**Strategy for Predators:**
+- Coordinate to surround prey
+- Target isolated individuals
+- Use newly infected to reveal hiding spots
+- Block escape routes systematically
+
+---
+
+### 📸 Photo Safari Mode
+**Duration:** Variable | **Recommended for:** Photography enthusiasts, proof-based gameplay
+
+Photographs are REQUIRED before captures are allowed.
+
+**Critical Rule Changes:**
+- 📷 Predators MUST photograph prey BEFORE capture
+- 🎯 System tracks which prey each predator has photographed
+- 💯 Double photo points (50 instead of 25)
+- ✅ Capture only allowed if photo exists
+
+**Scoring:**
+| Action | Points |
+|--------|--------|
+| Photo of target | +50 |
+| Capture (after photo) | +100 |
+| Escape | +75 |
+| Survival bonus | +200 |
+
+**How It Works:**
+1. Predator spots prey
+2. Predator uploads photo sighting via dashboard
+3. System records that predator has "unlocked" that specific prey
+4. Now predator can attempt capture
+5. Without photo, capture is rejected!
+
+**Tracker Display Shows:**
+- "Photo Safari Mode [LIVE]"
+- "PREDATOR (Snap First!)" or "PREY (Hide!)"
+- Photo requirement reminders
+
+**Strategy Tips:**
+- Predators: Keep phone ready for quick snaps
+- Prey: Covering face/identifying features helps
+- Strategic to photo multiple prey first
+- Prey can be more aggressive since photos take time
+
+---
+
+## 🚨 Emergency System
+
+### Overview
+
+The Emergency System is a **critical safety feature** that takes absolute priority over all gameplay.
+
+### How to Trigger Emergency
+
+**From Tracker Device:**
+- Hold PRG button for 3 seconds
+- Then press button 3 times quickly
+- Screen shows "EMERGENCY SENDING..."
+- LED flashes rapidly in red
+
+**From Web Dashboard:**
+- Click the red 🚨 Emergency button
+- Confirm the action
+- Optionally add reason
+
+**From Admin Panel:**
+- Click "TRIGGER EMERGENCY" button
+- Enter optional reason
+- Instant activation
+
+### What Happens When Emergency is Triggered
+
+1. **Game Automatically Pauses**
+   - All gameplay stops immediately
+   - No captures can occur
+   - Timer pauses
+
+2. **All Players Notified**
+   - Web dashboard shows emergency overlay
+   - Tracker OLED shows full-screen emergency alert
+   - LED pattern changes to rapid blinking
+   - Audio alert on web (if enabled)
+
+3. **Location Information Shared**
+   - Player's name and ID broadcast
+   - Last known nearby players listed
+   - Signal strength to help locate
+   - Last sighting information
+
+4. **Admin Panel Shows:**
+   - Emergency banner (red, pulsing)
+   - Player who triggered
+   - Time of emergency
+   - Nearest players (by RSSI)
+   - Last known interactions
+
+### Clearing Emergency
+
+**Only Admin/Moderators can clear:**
+1. Physically locate the player in need
+2. Ensure they are safe
+3. Click "Clear Emergency" in admin panel
+4. Game can resume
+
+**Important:** Game CANNOT resume until emergency is cleared.
+
+### When to Use Emergency
+
+✅ **Appropriate Uses:**
+- Medical emergency (injury, health issue)
+- Feeling unsafe or threatened
+- Lost or disoriented
+- Equipment malfunction in dangerous area
+- Witness to emergency (someone else needs help)
+- Weather emergency
+
+❌ **NOT for:**
+- Being captured in game
+- Running out of battery
+- Wanting to pause for break
+- Getting tired
+- General questions
+
+### Emergency Display on Tracker
+
+```
+┌─────────────────────┐
+│   🚨 EMERGENCY 🚨   │
+│                     │
+│   GAME PAUSED       │
+│                     │
+│ Player: ShadowWolf  │
+│ ID: T9EF0           │
+│                     │
+│ FIND THIS PLAYER!   │
+│                     │
+│ Nearest to you:     │
+│ -45dB (VERY CLOSE)  │
+└─────────────────────┘
+```
+
+---
+
+## 📱 Tracker Display Information
+
+### What Your Tracker Shows
+
+**Line 1: Identity & Connection**
+```
+T9EF0 [W][S] SAFE
+```
+- Your tracker ID
+- [W] = WiFi connected (or [W!] if disconnected)
+- [S] = Server connected (or [S?] if unreachable)
+- SAFE = Currently in safe zone
+
+**Line 2: Role & Game Mode**
+```
+PREDATOR (Infector) | Classic Hunt
+```
+- Your current role
+- Context based on game mode
+- Current game mode name
+
+**Line 3: Game Phase**
+```
+Game: RUNNING [LIVE]
+```
+- lobby, countdown, running, paused, ended
+- Timer information if applicable
+
+**Line 4: Nearby Detection**
+```
+3 nearby | Closest: TA2B3 -65dB
+```
+- Number of players detected
+- Closest player ID and signal strength
+
+**Line 5: Context Actions**
+```
+BTN=Capture | 2 attempts today
+```
+- Available action for button press
+- Relevant statistics
+
+### LED Indicator Patterns
+
+| Pattern | Meaning |
+|---------|---------|
+| Solid ON | Normal operation, stable connection |
+| Slow blink (2s) | In safe zone |
+| Medium blink (500ms) | No server connection |
+| Fast blink (200ms) | Captured status |
+| Rapid strobe (100ms) | Emergency active |
+| OFF | No WiFi connection |
+
+### Server Timeout Warning
+
+If server becomes unreachable for 45+ seconds:
+```
+┌─────────────────────┐
+│ ! SERVER OFFLINE !  │
+│                     │
+│ Last contact: 47s   │
+│                     │
+│ Check WiFi/Server   │
+│ Game state unknown  │
+└─────────────────────┘
+```
+
+---
+
+## 🏆 Scoring Tables by Mode
+
+### Classic Hunt
+| Role | Action | Points |
+|------|--------|--------|
+| Pred | Capture | +100 |
+| Pred | 3+ captures | +50 bonus |
+| Pred | 5+ captures | +100 bonus |
+| Pred | Photo sighting | +25 |
+| Prey | Escape | +75 |
+| Prey | Photo sighting | +25 |
+| Prey | Survival (0 captures) | +200 |
+
+### Quick Match
+Same as Classic, but survival bonus = +150
+
+### Endurance
+Same as Classic, but survival bonus = +500
+
+### Team Competition
+- Standard scoring per player
+- Winning team: +300 per member
+- Team rankings by total captures
+
+### Infection Mode
+| Action | Points |
+|--------|--------|
+| Infection (capture) | +50 |
+| Time survived (per min) | +10 |
+| Last survivor | +1000 |
+
+### Photo Safari
+| Action | Points |
+|--------|--------|
+| Photo of target | +50 |
+| Capture (post-photo) | +100 |
+| Escape | +75 |
+| Survival | +200 |
+
+---
+
+## 🎮 Mode Selection Guide
+
+### Choose Classic Hunt When:
+- New players are learning
+- Balanced gameplay desired
+- Standard 30-minute session
+- Mixed skill levels
+
+### Choose Quick Match When:
+- Limited time available
+- Tournament rounds
+- High energy desired
+- Testing strategies quickly
+
+### Choose Endurance When:
+- Experienced players
+- Physical fitness focus
+- Strategic depth wanted
+- Large play area available
+
+### Choose Team Competition When:
+- 8+ players available
+- Team building event
+- Communication practice
+- Corporate or group events
+
+### Choose Infection Mode When:
+- Exciting finale desired
+- Growing intensity wanted
+- 6+ prey to start
+- Dramatic endgame
+
+### Choose Photo Safari When:
+- Proof-based gameplay
+- Photography enthusiasts
+- Slower-paced preference
+- Evidence matters
+
+---
+
+## 🛡️ Safety Rules
 
 ### Physical Safety
 - Watch where you're going
-- Don't run into traffic
-- Be aware of obstacles
+- Don't run into traffic or obstacles
 - Stay hydrated
-- Respect boundaries
+- Know your physical limits
+- Respect weather conditions
+
+### Emergency Protocol
+1. If you need help: **TRIGGER EMERGENCY IMMEDIATELY**
+2. Stay calm and stay put (if safe)
+3. Your tracker broadcasts your presence
+4. Other players will be alerted to find you
+5. Game pauses until you're safe
 
 ### Game Boundaries
-- Define play area before game
-- No going into unsafe areas
-- Out of bounds = DQ
-- Respect property
+- Stay within defined play area
+- Out of bounds = disqualification
+- Respect private property
+- No dangerous locations (roads, cliffs, etc.)
 
 ### Social Safety
 - Share game plans with non-players
 - Have emergency contacts
-- Use emergency button if needed
 - Buddy system recommended
+- Report inappropriate behavior
 
 ### Fair Play
-- No interfering with equipment
-- No blocking safe zones
 - No physical contact
+- No equipment tampering
+- No blocking safe zone entrances
 - Respect other players
-- Report cheating to mods
+- Follow moderator instructions
 
 ---
 
-## 💡 Pro Tips
+## 💡 Advanced Strategies
 
-### Tracker Management
-- Check battery before game
-- Understand your display
-- Know button functions
-- Watch for notifications
+### For Predators in Infection Mode
+- **Initial Phase:** Work together to create panic
+- **Mid Game:** Use infected to reveal prey locations
+- **End Game:** Systematically sweep areas
+- **Pro Tip:** Newly infected know where prey hide
 
-### Web Dashboard
-- Keep open on phone
-- Use chat actively
-- Upload photos when safe
-- Check leaderboard for motivation
+### For Prey in Infection Mode
+- **Initial Phase:** Spread out, don't cluster
+- **Mid Game:** Be suspicious of EVERYONE
+- **End Game:** Most hidden location wins
+- **Pro Tip:** Your friends are your future enemies
 
-### Environmental Awareness
-- Use terrain (hills, buildings)
-- Know signal blocking areas
-- Weather considerations
-- Lighting for photo sightings
+### For Photo Safari Predators
+- **Preparation:** Phone charged and ready
+- **Execution:** Quick snap before they run
+- **Strategy:** Photo multiple prey first, capture later
+- **Pro Tip:** Use team chat to coordinate photography
 
-### Mental Game
-- Stay calm when captured
-- Don't give up - escape is possible
-- Adapt strategies mid-game
-- Have fun regardless of score
-
----
-
-## 🎮 Sample Game Timeline
-
-**Pre-Game (10 min)**
-- Players arrive, get trackers
-- Log into web dashboard
-- Set nicknames, upload photos
-- Choose roles
-- Safety briefing
-
-**Countdown (10 sec)**
-- Admin starts game
-- Players take positions
-- Tension builds
-
-**Early Game (0-10 min)**
-- Prey scatter and hide
-- Preds begin searching
-- First captures likely
-- Establishing patterns
-
-**Mid Game (10-20 min)**
-- Prey learning pred patterns
-- Preds communicating intel
-- Photo sightings increasing
-- Escapes happening
-
-**Late Game (20-30 min)**
-- Intensity peaks
-- Strategic plays
-- Leaderboard races
-- Final captures/escapes
-
-**End Game**
-- Timer expires
-- Final scores calculated
-- Winners announced
-- Stories shared
+### For Photo Safari Prey
+- **Defense:** Obscure identifiable features
+- **Offense:** Force predators into photos before capture
+- **Strategy:** Move after being photographed
+- **Pro Tip:** They need you in frame to count
 
 ---
 
-## 🏅 Victory Conditions
+## 🎉 Post-Game
 
-### Individual Glory
-- Highest points in your role
-- Most captures (pred)
-- Most escapes (prey)
-- Never caught (prey)
+### What Happens When Game Ends
 
-### Team Pride
-- Total team points
-- Coordinated strategies
-- Helping teammates
+1. **Final Scores Calculated**
+   - All bonuses applied
+   - Rankings determined
+   - Statistics compiled
 
-### Achievement Hunting
-- First capture
-- First escape
-- Most sightings
-- Longest survival
+2. **Leaderboards Updated**
+   - Top predators listed
+   - Top prey listed
+   - Special achievements shown
 
----
+3. **Photo Gallery Available**
+   - All sightings viewable
+   - Capture moments documented
+   - Memories preserved
 
-## 🎉 Making It Fun
-
-### For Organizers
-- Clear rules explanation
-- Appropriate difficulty
-- Balance teams
-- Monitor fun factor
-- Adjust mid-game if needed
-
-### For Players
-- Embrace the role
-- Communicate with team
-- Celebrate successes
-- Learn from captures
-- Good sportsmanship
-
-### After Game
-- Share best moments
-- Review photo gallery
-- Discuss strategies
-- Plan next game
-- Thank the organizers
+### Achievements to Earn
+- **First Blood:** First capture of the game
+- **Survivor:** Never captured (prey)
+- **Hunter:** 5+ captures (pred)
+- **Paparazzi:** 10+ photo sightings
+- **Escape Artist:** 3+ escapes
+- **Last Standing:** Final survivor (infection)
 
 ---
 
-**Remember: The goal is FUN! Points are great, but the memories and experiences are what matter. Play fair, stay safe, and enjoy the hunt!**
+## 📋 Quick Reference Card
+
+### Button Functions on Tracker
+| Action | Function |
+|--------|----------|
+| Single Press (Pred) | Attempt capture |
+| Single Press (Prey) | Show status info |
+| Hold 3s + 3 presses | EMERGENCY |
+| Single Press (Unassigned) | Show setup URL |
+
+### Common RSSI Values
+| RSSI | Distance | Capture? |
+|------|----------|----------|
+| -30 to -50 | 1-3m | ✅ Yes |
+| -50 to -60 | 3-7m | ✅ Likely |
+| -60 to -70 | 7-15m | ⚠️ Maybe |
+| -70 to -90 | 15m+ | ❌ No |
+
+### Game Phases
+- **Lobby:** Setup, role selection
+- **Countdown:** Game about to start
+- **Running:** Active gameplay
+- **Paused:** Temporarily stopped
+- **Ended:** Game complete
+
+---
+
+**Remember: Safety first, fun always! The Emergency System exists for real emergencies. When in doubt, trigger it. Your safety is more important than any game.**
 
 🎯🦊🐰 **Happy Hunting!** 🐰🦊🎯
