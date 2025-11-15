@@ -29,42 +29,6 @@ import random
 import sys
 
 # =============================================================================
-# LOAD CONFIGURATION
-# =============================================================================
-
-# Try to load local config first, fall back to default
-try:
-    from config_local import *
-    print("✅ Loaded local configuration (config_local.py)")
-except ImportError:
-    try:
-        from config import *
-        print("ℹ️  Using default configuration (config.py)")
-        print("   Create config_local.py for custom settings")
-    except ImportError:
-        print("⚠️  No config file found, using hardcoded defaults")
-        # Hardcoded fallbacks
-        ADMIN_PASSWORD = "hunt2024!"
-        SECRET_KEY = None
-        HOST = "0.0.0.0"
-        PORT = 5000
-        DEBUG = True
-        SESSION_LIFETIME_HOURS = 12
-        MAX_UPLOAD_SIZE = 16 * 1024 * 1024
-        DEFAULT_CAPTURE_RSSI = -70
-        DEFAULT_SAFEZONE_RSSI = -75
-        SIGHTING_POINTS = 25
-        SIGHTING_COOLDOWN = 30
-        CAPTURE_COOLDOWN = 10
-        PLAYER_TIMEOUT = 30
-        MAX_PLAYERS = 100
-        MAX_EVENTS = 1000
-        MAX_MESSAGES = 500
-        UPLOAD_FOLDER = "uploads"
-        SOCKETIO_ASYNC_MODE = "threading"
-        ALLOW_UNSAFE_WERKZEUG = True
-
-# =============================================================================
 # APP SETUP
 # =============================================================================
 
@@ -85,31 +49,16 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # =============================================================================
-# CONFIGURATION (loaded from config.py or config_local.py)
+# CONFIGURATION
 # =============================================================================
 
-# These can be overridden by environment variables for extra security
-ADMIN_PASSWORD = os.environ.get("IRLHUNTS_ADMIN_PASSWORD", ADMIN_PASSWORD if 'ADMIN_PASSWORD' in dir() else "hunt2024!")
-
-# Use config values or defaults
-if 'DEFAULT_CAPTURE_RSSI' not in dir():
-    DEFAULT_CAPTURE_RSSI = -70
-if 'DEFAULT_SAFEZONE_RSSI' not in dir():
-    DEFAULT_SAFEZONE_RSSI = -75
-if 'SIGHTING_POINTS' not in dir():
-    SIGHTING_POINTS = 25
-if 'SIGHTING_COOLDOWN' not in dir():
-    SIGHTING_COOLDOWN = 30
-if 'CAPTURE_COOLDOWN' not in dir():
-    CAPTURE_COOLDOWN = 10
-if 'PLAYER_TIMEOUT' not in dir():
-    PLAYER_TIMEOUT = 30
-if 'MAX_PLAYERS' not in dir():
-    MAX_PLAYERS = 100
-if 'MAX_EVENTS' not in dir():
-    MAX_EVENTS = 1000
-if 'MAX_MESSAGES' not in dir():
-    MAX_MESSAGES = 500
+ADMIN_PASSWORD = os.environ.get("IRLHUNTS_ADMIN_PASSWORD", "hunt2024!")
+DEFAULT_CAPTURE_RSSI = -70
+DEFAULT_SAFEZONE_RSSI = -75
+SIGHTING_POINTS = 25
+SIGHTING_COOLDOWN = 30  # Seconds between sightings of same target
+CAPTURE_COOLDOWN = 10
+PLAYER_TIMEOUT = 30
 
 # =============================================================================
 # GAME MODES CONFIGURATION
@@ -262,7 +211,7 @@ def log_event(event_type, data, broadcast=True):
         "time_str": now_str()
     }
     events.append(event)
-    if len(events) > MAX_EVENTS:
+    if len(events) > 1000:
         events.pop(0)
     if broadcast:
         socketio.emit("event", event, room="all")
@@ -1647,7 +1596,7 @@ def api_send_message():
     }
     
     messages.append(msg)
-    if len(messages) > MAX_MESSAGES:
+    if len(messages) > 500:
         messages.pop(0)
     
     socketio.emit("message", msg, room="all")
@@ -1837,25 +1786,14 @@ server_start_time = time.time()
 # =============================================================================
 
 if __name__ == "__main__":
-    # Get config values with defaults
-    host = HOST if 'HOST' in dir() else "0.0.0.0"
-    port = PORT if 'PORT' in dir() else 5000
-    debug = DEBUG if 'DEBUG' in dir() else True
-    unsafe_werkzeug = ALLOW_UNSAFE_WERKZEUG if 'ALLOW_UNSAFE_WERKZEUG' in dir() else True
-    
     print("=" * 60)
     print("  🎯 IRL Hunts Game Server v4")
     print("  Complete Game Modes + Emergency System")
     print("=" * 60)
-    print(f"  Admin Password: {'*' * len(ADMIN_PASSWORD)} (hidden)")
-    print(f"  Server URL: http://{host}:{port}")
-    print(f"  Debug Mode: {debug}")
-    print(f"  Max Players: {MAX_PLAYERS}")
+    print(f"  Admin Password: {ADMIN_PASSWORD}")
+    print(f"  Server URL: http://0.0.0.0:5000")
     print(f"  Available Modes: {', '.join(GAME_MODES.keys())}")
-    print("=" * 60)
-    print("  Configuration: config_local.py (if exists) or config.py")
-    print("  Change settings by editing config files, not source code!")
     print("=" * 60)
     
     start_background_thread()
-    socketio.run(app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=unsafe_werkzeug)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)

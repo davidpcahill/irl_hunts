@@ -29,7 +29,23 @@
 #include <map>
 #include <vector>
 
-#define LORA_NSS    8
+// Load configuration - try local first, then default
+#if __has_include("config_local.h")
+  #include "config_local.h"
+  #define CONFIG_SOURCE "config_local.h"
+#elif __has_include("config.h")
+  #include "config.h"
+  #define CONFIG_SOURCE "config.h"
+#else
+  #error "No config file found! Copy config.h.example to config.h and edit it."
+#endif
+
+// Use config values for pins (with fallbacks for backward compatibility)
+#ifndef PIN_LORA_NSS
+  #define PIN_LORA_NSS 8
+#endif
+
+#define LORA_NSS    PIN_LORA_NSS
 #define LORA_DIO1   14
 #define LORA_RST    12
 #define LORA_BUSY   13
@@ -45,20 +61,63 @@
 #define LED_PIN     35
 #define LORA_FREQ   915.0
 
-const char* WIFI_SSID = "YOUR_WIFI_NAME";
-const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";
-const char* SERVER_URL = "http://YOUR_SERVER_IP:5000";
+// WiFi and Server settings from config
+#ifndef WIFI_SSID
+  #error "WIFI_SSID not defined! Check your config file."
+#endif
+#ifndef WIFI_PASS
+  #error "WIFI_PASS not defined! Check your config file."
+#endif
+#ifndef SERVER_URL
+  #error "SERVER_URL not defined! Check your config file."
+#endif
 
-const unsigned long PING_INTERVAL = 5000;
-const unsigned long BEACON_INTERVAL = 3000;
-const unsigned long DISPLAY_UPDATE_INTERVAL = 100;
-const unsigned long SCROLL_SPEED = 150;
-const unsigned long WIFI_RECONNECT_INTERVAL = 15000;  // Faster reconnect
-const unsigned long NOTIFICATION_DURATION = 3000;
-const unsigned long SERVER_TIMEOUT_THRESHOLD = 45000;
-const unsigned long EMERGENCY_HOLD_TIME = 2000;
-const int EMERGENCY_TAP_COUNT = 3;
-const unsigned long EMERGENCY_TAP_WINDOW = 2000;
+const char* wifi_ssid = WIFI_SSID;
+const char* wifi_pass = WIFI_PASS;
+const char* server_url = SERVER_URL;
+
+// Timing constants from config (with defaults)
+#ifndef PING_INTERVAL
+  #define PING_INTERVAL 5000
+#endif
+#ifndef BEACON_INTERVAL
+  #define BEACON_INTERVAL 3000
+#endif
+#ifndef DISPLAY_UPDATE_INTERVAL
+  #define DISPLAY_UPDATE_INTERVAL 100
+#endif
+#ifndef SCROLL_SPEED
+  #define SCROLL_SPEED 150
+#endif
+#ifndef WIFI_RECONNECT_INTERVAL
+  #define WIFI_RECONNECT_INTERVAL 15000
+#endif
+#ifndef NOTIFICATION_DURATION
+  #define NOTIFICATION_DURATION 3000
+#endif
+#ifndef SERVER_TIMEOUT_THRESHOLD
+  #define SERVER_TIMEOUT_THRESHOLD 45000
+#endif
+#ifndef EMERGENCY_HOLD_TIME
+  #define EMERGENCY_HOLD_TIME 2000
+#endif
+#ifndef EMERGENCY_TAP_COUNT
+  #define EMERGENCY_TAP_COUNT 3
+#endif
+#ifndef EMERGENCY_TAP_WINDOW
+  #define EMERGENCY_TAP_WINDOW 2000
+#endif
+
+const unsigned long ping_interval = PING_INTERVAL;
+const unsigned long beacon_interval = BEACON_INTERVAL;
+const unsigned long display_update_interval = DISPLAY_UPDATE_INTERVAL;
+const unsigned long scroll_speed = SCROLL_SPEED;
+const unsigned long wifi_reconnect_interval = WIFI_RECONNECT_INTERVAL;
+const unsigned long notification_duration = NOTIFICATION_DURATION;
+const unsigned long server_timeout_threshold = SERVER_TIMEOUT_THRESHOLD;
+const unsigned long emergency_hold_time = EMERGENCY_HOLD_TIME;
+const int emergency_tap_count = EMERGENCY_TAP_COUNT;
+const unsigned long emergency_tap_window = EMERGENCY_TAP_WINDOW;
 
 SPIClass loraSPI(HSPI);
 SX1262 radio = new Module(LORA_NSS, LORA_DIO1, LORA_RST, LORA_BUSY, loraSPI);
@@ -119,16 +178,24 @@ void checkWiFiConnection() {
   
   if (!wifiConnected && (millis() - lastWifiCheck > WIFI_RECONNECT_INTERVAL)) {
     lastWifiCheck = millis();
-    Serial.println("Attempting WiFi reconnect...");
+    static int reconnectAttempts = 0;
+    reconnectAttempts++;
+    
+    Serial.println("Attempting WiFi reconnect (attempt " + String(reconnectAttempts) + ")...");
     WiFi.disconnect();
     delay(100);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    WiFi.begin(wifi_ssid, wifi_pass);
     
     // Wait a bit for connection
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 10) {
       delay(500);
       attempts++;
+    }
+    
+    // Reset counter on success
+    if (WiFi.status() == WL_CONNECTED) {
+      reconnectAttempts = 0;
     }
   }
 }
@@ -236,7 +303,7 @@ void displayMain() {
     drawStatusBar();
     display.drawString(0, 14, "ROLE NOT SET");
     display.drawString(0, 26, "Open phone browser:");
-    drawScrollingText(38, String(SERVER_URL));
+    drawScrollingText(38, String(server_url));
     display.drawString(0, 50, "Enter ID: " + NODE_ID);
     display.display();
     return;
@@ -387,7 +454,7 @@ void pingServer() {
   for (auto& b : beaconRssi) bRssi[b.first] = b.second;
   String json; serializeJson(doc, json);
   
-  http.begin(String(SERVER_URL) + "/api/tracker/ping");
+  http.begin(String(server_url) + "/api/tracker/ping");
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(5000);
   int code = http.POST(json);
@@ -511,7 +578,7 @@ void attemptCapture() {
   doc["pred_id"] = NODE_ID; doc["prey_id"] = targetId; doc["rssi"] = bestRssi;
   String json; serializeJson(doc, json);
   
-  http.begin(String(SERVER_URL) + "/api/tracker/capture");
+  http.begin(String(server_url) + "/api/tracker/capture");
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(5000);
   int code = http.POST(json);
@@ -538,7 +605,7 @@ void triggerEmergency() {
   doc["reason"] = "Emergency triggered from tracker device";
   String json; serializeJson(doc, json);
   
-  http.begin(String(SERVER_URL) + "/api/tracker/emergency");
+  http.begin(String(server_url) + "/api/tracker/emergency");
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(5000);
   int code = http.POST(json);
@@ -599,7 +666,7 @@ void handleButton() {
         } else {
           showNotification("Safe for now. Stay alert!", "info");
         }
-      } else showNotification("Set role at " + String(SERVER_URL), "info");
+      } else showNotification("Set role at " + String(server_url), "info");
     }
     btnHeld = true;
   }
@@ -618,6 +685,7 @@ void setup() {
   Serial.println("\n========================================");
   Serial.println("IRL Hunts Tracker v4.1");
   Serial.println("Build: " __DATE__ " " __TIME__);
+  Serial.println("Config: " CONFIG_SOURCE);
   Serial.println("========================================");
   
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -657,7 +725,7 @@ void setup() {
   
   displayStartup("Connecting to WiFi...");
   WiFi.mode(WIFI_STA); WiFi.setHostname(NODE_ID.c_str());
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.begin(wifi_ssid, wifi_pass);
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     delay(500); attempts++;
@@ -680,11 +748,27 @@ void setup() {
 }
 
 float getBatteryVoltage() {
-  // Heltec V3 battery monitoring on ADC pin
-  // Note: This is approximate, may need calibration
-  int adcValue = analogRead(1);  // ADC1 for battery
-  float voltage = (adcValue / 4095.0) * 3.3 * 2;  // Voltage divider
-  return voltage;
+  // Heltec V3 battery monitoring
+  // Uses internal ADC with voltage divider on board
+  // GPIO1 is connected to battery through voltage divider
+  
+  // Configure ADC for battery reading
+  analogSetPinAttenuation(1, ADC_11db);  // Full range 0-3.3V
+  
+  int adcValue = analogRead(1);
+  
+  // Heltec V3 has a voltage divider: 390K / 100K
+  // So actual voltage = ADC voltage * (390 + 100) / 100 = ADC * 4.9
+  // But ADC reads 0-4095 for 0-3.3V
+  float adcVoltage = (adcValue / 4095.0) * 3.3;
+  float batteryVoltage = adcVoltage * 4.9;
+  
+  // Sanity check - LiPo should be 3.0V - 4.2V
+  if (batteryVoltage < 2.5 || batteryVoltage > 4.5) {
+    return 0.0;  // Invalid reading
+  }
+  
+  return batteryVoltage;
 }
 
 void checkBattery() {

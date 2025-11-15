@@ -173,14 +173,3 @@ coverage.xml
 *.bak
 *.backup
 *~
-
-# =========================
-# Configuration Files (sensitive data)
-# =========================
-# Local configs with credentials - NEVER commit these!
-server/config_local.py
-devices/*/config_local.h
-
-# Keep example configs in repo
-!server/config_local.py.example
-!devices/*/config_local.h.example

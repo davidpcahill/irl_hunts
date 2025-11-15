@@ -528,6 +528,22 @@ Same as Classic, but survival bonus = +500
 
 ---
 
+## ⌨️ Web Dashboard Keyboard Shortcuts
+
+The web dashboard supports keyboard shortcuts for quick actions:
+
+| Key | Action |
+|-----|--------|
+| `P` | Open photo sighting upload |
+| `R` | Refresh all data |
+| `Esc` | Close modals, dismiss overlays |
+| `?` | Toggle keyboard shortcuts help |
+| `Enter` | Send message (when in chat input) |
+
+**Note:** Shortcuts are disabled when typing in input fields.
+
+---
+
 ## 📋 Quick Reference Card
 
 ### Button Functions on Tracker

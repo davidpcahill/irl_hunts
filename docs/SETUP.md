@@ -39,17 +39,32 @@ pip install --break-system-packages -r requirements.txt
 
 ### 1.2 Configure the Server
 
-Edit `app.py` and change:
+Create your local configuration file:
+
+```bash
+cd server
+cp config_local.py.example config_local.py
+```
+
+Edit `config_local.py`:
 
 ```python
-# Line 21 - CHANGE THIS PASSWORD!
+# Your secure admin password
 ADMIN_PASSWORD = "your_secure_password"
 
-# Line 22-24 - Adjust game defaults if needed
-DEFAULT_CAPTURE_RSSI = -70      # Higher = closer required
-DEFAULT_SAFEZONE_RSSI = -75     # Safe zone detection range
-PROXIMITY_ALERT_RSSI = -80      # Warning distance
+# Your Flask secret key (generate with: python -c "import secrets; print(secrets.token_hex(32))")
+SECRET_KEY = "your_random_secret_key"
+
+# Production settings (disable for real games)
+DEBUG = False
+ALLOW_UNSAFE_WERKZEUG = False
+
+# Optional: Adjust game defaults
+# DEFAULT_CAPTURE_RSSI = -70      # Higher = closer required
+# DEFAULT_SAFEZONE_RSSI = -75     # Safe zone detection range
 ```
+
+**Important:** `config_local.py` contains sensitive credentials and should NEVER be committed to git!
 
 ### 1.3 Find Your Server IP
 
@@ -119,21 +134,31 @@ Install these (search by name):
 
 ### 2.4 Configure Tracker Code
 
-Open `devices/tracker/tracker.ino`
+Create your local configuration file:
 
-Edit these lines (around line 50-52):
-```cpp
-const char* WIFI_SSID = "YOUR_WIFI_NAME";
-const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";
-const char* SERVER_URL = "http://YOUR_SERVER_IP:5000";
+```bash
+cd devices/tracker
+cp config_local.h.example config_local.h
 ```
 
-Example:
+Edit `config_local.h`:
+
 ```cpp
-const char* WIFI_SSID = "MyHomeWifi";
-const char* WIFI_PASS = "MyPassword123";
-const char* SERVER_URL = "http://192.168.1.100:5000";
+// Your WiFi credentials
+#define WIFI_SSID "MyHomeWifi"
+#define WIFI_PASS "MyPassword123"
+
+// Your server IP (find with ipconfig or ifconfig)
+#define SERVER_URL "http://192.168.1.100:5000"
+
+// Your region's LoRa frequency
+#define LORA_FREQUENCY 915.0  // Americas (use 868.0 for Europe)
 ```
+
+**Important:** 
+- `config_local.h` contains your WiFi password and should NEVER be committed to git!
+- The .ino file automatically includes config_local.h if it exists
+- All config options are in `config.h` with documentation
 
 ### 2.5 Select Board Settings
 
@@ -404,3 +429,64 @@ With everything set up, you're ready to host an amazing IRL Hunts game. Remember
 - Take photos of the fun!
 
 Happy Hunting! 🎯🦊🐰
+
+
+---
+
+## 📁 Configuration Files
+
+IRL Hunts uses separate configuration files to keep sensitive data out of source code.
+
+### Server Configuration
+
+| File | Purpose | Commit to Git? |
+|------|---------|----------------|
+| `server/config.py` | Default settings, documentation | ✅ Yes |
+| `server/config_local.py` | Your local overrides, credentials | ❌ NO! |
+| `server/config_local.py.example` | Template for local config | ✅ Yes |
+
+### Device Configuration
+
+| File | Purpose | Commit to Git? |
+|------|---------|----------------|
+| `devices/*/config.h` | Default settings, all options documented | ✅ Yes |
+| `devices/*/config_local.h` | Your WiFi credentials, server URL | ❌ NO! |
+| `devices/*/config_local.h.example` | Template for local config | ✅ Yes |
+
+### How It Works
+
+1. **Server**: Python tries to `from config_local import *` first. If not found, falls back to `config.py`.
+
+2. **Devices**: Arduino `#include` checks for `config_local.h` first using `__has_include()`.
+
+3. **Security**: Local config files are in `.gitignore` so you won't accidentally commit passwords.
+
+### Quick Setup
+
+```bash
+# Server
+cd server
+cp config_local.py.example config_local.py
+# Edit config_local.py with your settings
+
+# Tracker
+cd devices/tracker
+cp config_local.h.example config_local.h
+# Edit config_local.h with your WiFi/server info
+
+# Beacon
+cd devices/beacon
+cp config_local.h.example config_local.h
+# Edit config_local.h with your LoRa frequency
+```
+
+### Environment Variables
+
+For extra security, admin password can also be set via environment variable:
+
+```bash
+export IRLHUNTS_ADMIN_PASSWORD="my_secure_password"
+python app.py
+```
+
+Environment variable takes priority over config file.

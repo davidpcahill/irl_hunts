@@ -76,6 +76,11 @@ irlhunts/
 ```bash
 cd server
 pip install -r requirements.txt
+
+# Create local config
+cp config_local.py.example config_local.py
+# Edit config_local.py with your admin password
+
 python app.py
 ```
 
@@ -88,11 +93,11 @@ Server runs at `http://YOUR_IP:5000`
    - **RadioLib** by Jan Gromes
    - **ArduinoJson** by Benoit Blanchon (version 6.x or 7.x)
 
-2. Edit `devices/tracker/tracker.ino`:
+2. Create config file `devices/tracker/config_local.h`:
    ```cpp
-   const char* WIFI_SSID = "your_wifi";
-   const char* WIFI_PASS = "your_password";
-   const char* SERVER_URL = "http://YOUR_SERVER_IP:5000";
+   #define WIFI_SSID "your_wifi"
+   #define WIFI_PASS "your_password"
+   #define SERVER_URL "http://YOUR_SERVER_IP:5000"
    ```
 
 3. Flash to Heltec V3 devices
@@ -158,11 +163,12 @@ Physical locations with beacon devices:
 
 ### Player Dashboard
 - Profile with custom picture
-- Live game timer
+- Live game timer with low-time warnings
 - Leaderboard rankings
 - Team chat
 - Photo gallery
 - Status indicators
+- Keyboard shortcuts (P=photo, R=refresh, ?=help)
 
 ### Admin Panel
 - Game control buttons
@@ -257,13 +263,22 @@ BTN=Capture | 2 attempts
 
 ## 🛠️ Configuration
 
-### Server Settings (`server/app.py`)
+### Server Settings (`server/config_local.py`)
 ```python
 ADMIN_PASSWORD = "your_password"      # Change this!
-DEFAULT_CAPTURE_RSSI = -70            # Capture proximity
-DEFAULT_SAFEZONE_RSSI = -75           # Safe zone range
-SIGHTING_POINTS = 25                  # Points per photo
+SECRET_KEY = "random_secret"          # For sessions
+DEBUG = False                         # Production mode
 ```
+
+### Device Settings (`devices/*/config_local.h`)
+```cpp
+#define WIFI_SSID "your_wifi"
+#define WIFI_PASS "your_password"
+#define SERVER_URL "http://192.168.1.100:5000"
+#define LORA_FREQUENCY 915.0           # Your region
+```
+
+**Note:** Local config files are gitignored to protect your credentials!
 
 ### In-Game Settings (Admin Panel)
 - **Honor System** - Allow manual safe zone toggle

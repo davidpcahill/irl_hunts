@@ -232,6 +232,21 @@
             text-align: center;
             color: #feca57;
             font-family: monospace;
+            transition: color 0.3s;
+        }
+        
+        .timer.warning {
+            color: #e17055;
+        }
+        
+        .timer.critical {
+            color: #d63031;
+            animation: timerFlash 1s infinite;
+        }
+        
+        @keyframes timerFlash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         
         .leaderboard { max-height: 350px; overflow-y: auto; }
@@ -801,8 +816,20 @@
         </div>
     </div>
     
+
+    <!-- Keyboard Shortcuts Help -->
+    <div id="shortcuts-help" style="display: none; position: fixed; bottom: 150px; right: 20px; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); z-index: 100; font-size: 12px; max-width: 200px;">
+        <div style="font-weight: 600; margin-bottom: 10px; color: #feca57;">⌨️ Keyboard Shortcuts</div>
+        <div style="color: #ccc; line-height: 1.8;">
+            <div><kbd style="background: #333; padding: 2px 6px; border-radius: 3px;">P</kbd> Open photo sighting</div>
+            <div><kbd style="background: #333; padding: 2px 6px; border-radius: 3px;">R</kbd> Refresh data</div>
+            <div><kbd style="background: #333; padding: 2px 6px; border-radius: 3px;">Esc</kbd> Close modals</div>
+            <div><kbd style="background: #333; padding: 2px 6px; border-radius: 3px;">?</kbd> Toggle this help</div>
+        </div>
+    </div>
+    
     <script>
-        const socket = io();
+    const socket = io();
         const playerId = "{{ player.device_id }}";
         let playerData = {{ player|tojson }};
         let currentGameMode = "{{ game_mode }}";
@@ -1225,6 +1252,15 @@
                     const mins = Math.floor(state.time_remaining / 60);
                     const secs = state.time_remaining % 60;
                     timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                    
+                    // Timer warning colors
+                    if (state.time_remaining < 60) {
+                        timer.className = 'timer critical';
+                    } else if (state.time_remaining < 300) {
+                        timer.className = 'timer warning';
+                    } else {
+                        timer.className = 'timer';
+                    }
                     let infoText = `${state.online_count} online`;
                     if (modeConfig.infection && state.prey_count !== undefined) {
                         infoText += ` • ${state.prey_count} prey left`;
@@ -1502,6 +1538,12 @@
             formData.append('target_id', targetId);
             formData.append('photo', photoInput.files[0]);
             
+            // Check file size before upload (16MB limit)
+            if (photoInput.files[0].size > 16 * 1024 * 1024) {
+                notify('Photo too large! Maximum size is 16MB.', 'error');
+                return;
+            }
+            
             try {
                 const resp = await fetch('/api/sighting', {
                     method: 'POST',
@@ -1515,6 +1557,8 @@
                     loadGallery();
                     loadPhotographedPrey();  // Refresh photo list
                     photoInput.value = '';
+                } else if (resp.status === 413) {
+                    notify('Photo too large! Maximum size is 16MB.', 'error');
                 } else {
                     const data = await resp.json();
                     notify(data.error || 'Upload failed', 'error');
@@ -1625,6 +1669,7 @@
         setInterval(loadPlayers, 10000);
         setInterval(sendHeartbeat, 10000);
         setInterval(loadStats, 5000);
+        setInterval(loadPhotographedPrey, 15000);  // Refresh photo safari list
         
         // Initial stats load
         loadStats();
@@ -1639,17 +1684,27 @@
             // Don't trigger if typing in input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
             
-            switch(e.key.toLowerCase()) {
+            switch(e.key) {
                 case 'p':
+                case 'P':
                     openSightingModal();
                     break;
                 case 'r':
+                case 'R':
                     loadLeaderboard();
                     loadPlayers();
+                    loadGameState();
                     notify('Refreshed data', 'info');
                     break;
-                case 'escape':
+                case 'Escape':
                     closeSightingModal();
+                    dismissCaptured();
+                    break;
+                case '?':
+                    const help = document.getElementById('shortcuts-help');
+                    if (help) {
+                        help.style.display = help.style.display === 'none' ? 'block' : 'none';
+                    }
                     break;
             }
         });

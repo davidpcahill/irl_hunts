@@ -124,6 +124,7 @@
         .btn-primary { background: #6c5ce7; color: #fff; }
         .btn-danger { background: #d63031; color: #fff; }
         .btn-success { background: #00b894; color: #fff; }
+        .btn-warning { background: #fdcb6e; color: #000; }
         .btn-small { padding: 5px 10px; font-size: 12px; }
         .btn-emergency { 
             background: #d63031; 
@@ -513,7 +514,7 @@
             
             <div class="card">
                 <h2>👥 Players</h2>
-                <div style="margin-bottom: 10px;">
+                <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                     <select id="player-filter" onchange="loadPlayers()" style="padding: 5px; background: rgba(0,0,0,0.3); border: 1px solid rgba(108,92,231,0.3); border-radius: 5px; color: #fff;">
                         <option value="all">All Players</option>
                         <option value="online">Online Only</option>
@@ -522,6 +523,7 @@
                         <option value="prey">Prey</option>
                         <option value="captured">Captured</option>
                     </select>
+                    <span id="player-count-display" style="color: #888; font-size: 12px;">0 players</span>
                 </div>
                 <div style="max-height: 500px; overflow-y: auto;">
                     <table>
@@ -786,6 +788,7 @@
                 const filterEl = document.getElementById('player-filter');
                 const filter = filterEl ? filterEl.value : 'all';
                 tbody.innerHTML = '';
+                let playerCount = 0;
                 
                 for (const [id, p] of Object.entries(players)) {
                     // Apply filter
@@ -804,6 +807,13 @@
                         <button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')" title="Remove player">Kick</button>
                     </td>`;
                     tbody.appendChild(row);
+                    playerCount++;
+                }
+                
+                // Update count display
+                const countDisplay = document.getElementById('player-count-display');
+                if (countDisplay) {
+                    countDisplay.textContent = `${playerCount} player${playerCount !== 1 ? 's' : ''} shown`;
                 }
             } catch (err) { console.error('Failed to load players:', err); }
         }

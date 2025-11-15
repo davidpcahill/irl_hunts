@@ -1,0 +1,25 @@
+/*
+ * Local Configuration - EDIT THIS FILE!
+ * 
+ * Copy this to config_local.h and fill in your actual values.
+ * This file should NOT be committed to git!
+ */
+
+#ifndef CONFIG_LOCAL_H
+#define CONFIG_LOCAL_H
+
+// Your WiFi credentials
+#define WIFI_SSID "MyHomeWifi"
+#define WIFI_PASS "MySecurePassword123"
+
+// Your server IP (find with ipconfig or ifconfig)
+#define SERVER_URL "http://192.168.1.100:5000"
+
+// Your region's LoRa frequency
+#define LORA_FREQUENCY 915.0  // Americas
+
+// Optional: Custom device ID
+// #define USE_CUSTOM_ID 1
+// #define CUSTOM_DEVICE_ID "TRACKER1"
+
+#endif // CONFIG_LOCAL_H

@@ -13,8 +13,24 @@
 #include <Wire.h>
 #include "SSD1306Wire.h"
 
-// Heltec V3 Pins
-#define LORA_NSS    8
+// Load configuration
+#if __has_include("config_local.h")
+  #include "config_local.h"
+  #define CONFIG_SOURCE "config_local.h"
+#elif __has_include("config.h")
+  #include "config.h"
+  #define CONFIG_SOURCE "config.h"
+#else
+  #warning "No config file found, using defaults"
+  #define CONFIG_SOURCE "defaults"
+  #define LORA_FREQUENCY 915.0
+#endif
+
+// Heltec V3 Pins (from config or defaults)
+#ifndef PIN_LORA_NSS
+  #define PIN_LORA_NSS 8
+#endif
+#define LORA_NSS    PIN_LORA_NSS
 #define LORA_DIO1   14
 #define LORA_RST    12
 #define LORA_BUSY   13
@@ -48,6 +64,7 @@ void setup() {
   
   Serial.println("\n========================================");
   Serial.println("Safe Zone Beacon v2");
+  Serial.println("Config: " CONFIG_SOURCE);
   Serial.println("========================================");
   
   // Pins
