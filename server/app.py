@@ -347,6 +347,8 @@ def process_capture(pred_id, prey_id, rssi):
     
     if not pred or not prey_p:
         return False, "Invalid players"
+    if pred_id == prey_id:
+        return False, "Cannot capture yourself"
     if pred["role"] != "pred":
         return False, "Not a predator"
     if prey_p["role"] != "prey":
@@ -387,12 +389,15 @@ def process_capture(pred_id, prey_id, rssi):
         notify_all_players(f"🦠 {prey_p['name']} has been INFECTED!", "warning")
         socketio.emit("infection", {"pred": pred["name"], "prey": prey_p["name"]}, room="all")
         
-        prey_left = len([p for p in players.values() if p["role"] == "prey" and p["status"] != "captured"])
+        prey_left = len([p for p in players.values() if p["role"] == "prey"])
         if prey_left == 0:
             game["phase"] = "ended"
             game["end_time"] = now()
-            log_event("game_auto_end", {"reason": "All prey infected!"})
-            notify_all_players("🦠 ALL PREY INFECTED! Game Over!", "info")
+            # Find top infector
+            top_infector = max(players.values(), key=lambda p: p.get("infections", 0), default=None)
+            top_name = top_infector["name"] if top_infector else "Unknown"
+            log_event("game_auto_end", {"reason": "All prey infected!", "top_infector": top_name})
+            notify_all_players(f"🦠 ALL PREY INFECTED! {top_name} was top infector!", "success")
             socketio.emit("game_ended", get_leaderboard(), room="all")
         
         return True, f"Infected {prey_p['name']}! They're now a predator!"
@@ -409,6 +414,15 @@ def process_capture(pred_id, prey_id, rssi):
     notify_player(prey_id, f"CAPTURED by {pred['name']}!", "danger")
     notify_player(pred_id, f"You captured {prey_p['name']}!", "success")
     socketio.emit("capture", {"pred": pred["name"], "prey": prey_p["name"], "team": pred.get("team")}, room="all")
+    
+    # Check for bounty collection
+    if prey_id in bounties:
+        bounty_points = bounties[prey_id]["points"]
+        pred["points"] += bounty_points
+        log_event("bounty_collected", {"pred": pred["name"], "prey": prey_p["name"], "points": bounty_points})
+        notify_player(pred_id, f"💰 BOUNTY COLLECTED! +{bounty_points} bonus points!", "success")
+        notify_all_players(f"💰 {pred['name']} collected the bounty on {prey_p['name']}!", "info")
+        del bounties[prey_id]
     
     return True, f"Captured {prey_p['name']}!"
 
@@ -526,6 +540,8 @@ def check_player_timeouts():
             time_since_ping = current_time - player.get("last_ping", 0)
             if time_since_ping > PLAYER_TIMEOUT:
                 player["online"] = False
+                if game["phase"] == "running":
+                    log_event("player_timeout", {"player": player["name"], "device_id": device_id})
 
 def check_game_end():
     if game["phase"] == "running" and game["end_time"] and not game["emergency"]:
@@ -537,12 +553,30 @@ def check_game_end():
             notify_all_players("TIME'S UP! Game ended!", "info")
             socketio.emit("game_ended", lb, room="all")
 
+def cleanup_old_cooldowns():
+    """Clean up old cooldown entries to prevent memory leak"""
+    current_time = time.time()
+    # Clean capture cooldowns older than 5 minutes
+    expired_captures = [k for k, v in capture_cooldowns.items() if current_time - v > 300]
+    for k in expired_captures:
+        del capture_cooldowns[k]
+    # Clean sighting cooldowns older than 10 minutes
+    if 'sighting_cooldowns' in globals():
+        expired_sightings = [k for k, v in sighting_cooldowns.items() if current_time - v > 600]
+        for k in expired_sightings:
+            del sighting_cooldowns[k]
+
 def background_tasks():
     global background_thread_stop
+    cleanup_counter = 0
     while not background_thread_stop:
         try:
             check_player_timeouts()
             check_game_end()
+            cleanup_counter += 1
+            if cleanup_counter >= 12:  # Every minute (12 * 5 seconds)
+                cleanup_old_cooldowns()
+                cleanup_counter = 0
         except Exception as e:
             print(f"[ERROR] Background task: {e}")
         time.sleep(5)
@@ -673,7 +707,11 @@ def api_update_player():
     
     if "nickname" in data:
         nickname = str(data["nickname"]).strip()[:30]
-        nickname = "".join(c for c in nickname if c.isalnum() or c in " _-")
+        # Allow alphanumeric, spaces, underscores, hyphens, and common punctuation
+        nickname = "".join(c for c in nickname if c.isalnum() or c in " _-.'!?")
+        nickname = nickname.strip()
+        if len(nickname) < 2:
+            nickname = ""
         player["nickname"] = nickname
         old_name = player["name"]
         player["name"] = nickname if nickname else f"Player_{device_id[-4:]}"
@@ -681,12 +719,17 @@ def api_update_player():
             log_event("name_change", {"old": old_name, "new": player["name"]})
     
     if "role" in data and data["role"] in ["prey", "pred"]:
+        mode_config = get_mode_config()
         can_change = (
             game["phase"] == "lobby" or
-            (game["settings"]["allow_role_change"] and player["in_safe_zone"]) or
+            (game["settings"]["allow_role_change"] and player["in_safe_zone"] and not mode_config["infection"]) or
             session.get("is_admin") or
             device_id in moderators
         )
+        
+        # In infection mode during game, no manual role changes
+        if mode_config["infection"] and game["phase"] == "running" and not session.get("is_admin"):
+            return jsonify({"error": "Cannot change role in Infection mode"}), 400
         if can_change:
             old_role = player["role"]
             player["role"] = data["role"]
@@ -899,8 +942,13 @@ def api_upload_sighting():
         return jsonify({"error": "Invalid file type"}), 400
     
     filename = f"sighting_{device_id}_{target_id}_{uuid.uuid4().hex[:8]}.{ext}"
-    photo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
+    # Check file doesn't already exist (very unlikely with UUID but safe)
+    if os.path.exists(filepath):
+        return jsonify({"error": "Please try again"}), 400
+    
+    photo.save(filepath)
     player["sightings"] += 1
     
     if mode_config["photo_required"] and player["role"] == "pred":
@@ -1175,11 +1223,18 @@ def api_start_game():
     
     pred_count = len([p for p in players.values() if p["role"] == "pred" and p["status"] == "ready"])
     prey_count = len([p for p in players.values() if p["role"] == "prey" and p["status"] == "ready"])
+    online_count = len([p for p in players.values() if p["online"]])
     
     if pred_count == 0:
         return jsonify({"error": "Need at least one ready predator"}), 400
     if prey_count == 0:
         return jsonify({"error": "Need at least one ready prey"}), 400
+    if online_count < 2:
+        return jsonify({"error": "Need at least 2 online players"}), 400
+    
+    # Warn about imbalanced games
+    if pred_count > prey_count * 2:
+        log_event("game_imbalance", {"preds": pred_count, "prey": prey_count, "warning": "Too many predators"})
     
     mode_config = get_mode_config()
     data = request.json or {}
@@ -1289,6 +1344,33 @@ def api_reset_game():
     return jsonify({"success": True})
 
 # =============================================================================
+# PHOTO TRACKING API
+# =============================================================================
+
+@app.route("/api/player/photos", methods=["GET"])
+@login_required
+def api_get_player_photos():
+    """Get list of prey this predator has photographed (for Photo Safari mode)"""
+    device_id = session["device_id"]
+    if device_id == "ADMIN":
+        return jsonify([])
+    
+    player = get_player(device_id)
+    if player["role"] != "pred":
+        return jsonify([])
+    
+    photographed = []
+    for prey_id in player.get("has_photo_of", []):
+        if prey_id in players:
+            photographed.append({
+                "device_id": prey_id,
+                "name": players[prey_id]["name"],
+                "can_capture": True
+            })
+    
+    return jsonify(photographed)
+
+# =============================================================================
 # MESSAGING API
 # =============================================================================
 
@@ -1311,10 +1393,21 @@ def api_get_messages():
     
     player = get_player(device_id)
     visible = []
+    mode_config = get_mode_config()
+    
     for msg in messages[-100:]:
         if msg["to"] == "all":
             visible.append(msg)
+        elif msg["to"].startswith("team_") and mode_config["team_mode"]:
+            # Team mode: team_Alpha, team_Beta, etc.
+            if msg["to"] == f"team_{player.get('team')}":
+                visible.append(msg)
+        elif msg["to"].startswith("role_"):
+            # Role-based: role_pred, role_prey
+            if msg["to"] == f"role_{player['role']}":
+                visible.append(msg)
         elif msg["to"] == "team" and msg.get("team") == player["role"]:
+            # Legacy support
             visible.append(msg)
         elif msg["to"] == device_id or msg["from_id"] == device_id:
             visible.append(msg)
@@ -1326,26 +1419,39 @@ def api_get_messages():
 def api_send_message():
     device_id = session["device_id"]
     data = request.json or {}
-    content = str(data.get("message", ""))[:500].strip()
+    msg_content = str(data.get("message", ""))[:500].strip()
     to = data.get("to", "all")
     
-    if not content:
+    if not msg_content:
         return jsonify({"error": "Empty message"}), 400
     
     if device_id == "ADMIN":
         from_name = "📢 ADMIN"
         team = None
+        role = None
     else:
         player = get_player(device_id)
         from_name = player["name"]
-        team = player["role"]
+        team = player.get("team")  # Actual team name (Alpha, Beta, etc.)
+        role = player["role"]
+    
+    # Route team chat properly
+    if to == "team":
+        mode_config = get_mode_config()
+        if device_id == "ADMIN":
+            return jsonify({"error": "Admin cannot send team messages"}), 400
+        if mode_config["team_mode"] and team:
+            to = f"team_{team}"  # Route to specific team
+        else:
+            to = f"role_{role}"  # Route to role (pred/prey)
     
     msg = {
         "from_id": device_id,
         "from_name": from_name,
         "to": to,
         "team": team,
-        "message": content,
+        "role": role,
+        "message": msg_content,
         "time_str": now_str()
     }
     
@@ -1418,8 +1524,23 @@ def api_kick_player():
     device_id = data.get("device_id", "").upper()
     if device_id in players:
         name = players[device_id]["name"]
+        
+        # Cleanup associated data
+        if device_id in bounties:
+            del bounties[device_id]
+        if device_id in capture_cooldowns:
+            del capture_cooldowns[device_id]
+        # Clean sighting cooldowns involving this player
+        if 'sighting_cooldowns' in globals():
+            to_remove = [k for k in sighting_cooldowns if device_id in k]
+            for k in to_remove:
+                del sighting_cooldowns[k]
+        if device_id in moderators:
+            moderators.remove(device_id)
+        
         del players[device_id]
         log_event("player_kick", {"player": name})
+        notify_all_players(f"{name} was removed from the game", "info")
     return jsonify({"success": True})
 
 # =============================================================================

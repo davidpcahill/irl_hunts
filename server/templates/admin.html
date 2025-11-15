@@ -505,6 +505,16 @@
             
             <div class="card">
                 <h2>👥 Players</h2>
+                <div style="margin-bottom: 10px;">
+                    <select id="player-filter" onchange="loadPlayers()" style="padding: 5px; background: rgba(0,0,0,0.3); border: 1px solid rgba(108,92,231,0.3); border-radius: 5px; color: #fff;">
+                        <option value="all">All Players</option>
+                        <option value="online">Online Only</option>
+                        <option value="offline">Offline Only</option>
+                        <option value="pred">Predators</option>
+                        <option value="prey">Prey</option>
+                        <option value="captured">Captured</option>
+                    </select>
+                </div>
                 <div style="max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
@@ -752,8 +762,18 @@
                 const resp = await fetch('/api/players');
                 const players = await resp.json();
                 const tbody = document.getElementById('players-table');
+                const filterEl = document.getElementById('player-filter');
+                const filter = filterEl ? filterEl.value : 'all';
                 tbody.innerHTML = '';
+                
                 for (const [id, p] of Object.entries(players)) {
+                    // Apply filter
+                    if (filter === 'online' && !p.online) continue;
+                    if (filter === 'offline' && p.online) continue;
+                    if (filter === 'pred' && p.role !== 'pred') continue;
+                    if (filter === 'prey' && p.role !== 'prey') continue;
+                    if (filter === 'captured' && p.status !== 'captured') continue;
+                    
                     const row = document.createElement('tr');
                     const teamBadge = p.team ? `<span class="team-badge">${p.team}</span>` : '';
                     row.innerHTML = `<td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td><td>${id}</td><td>${escapeHtml(p.name)}</td><td>${p.role}</td><td>${teamBadge}</td><td><span class="status-badge status-${p.status}">${p.status}</span></td><td>${p.in_safe_zone ? '🏠' : ''}</td><td><button class="btn btn-small btn-primary" onclick="addMod('${id}')">+Mod</button>${p.status === 'captured' ? `<button class="btn btn-small btn-success" onclick="releasePlayer('${id}')">Release</button>` : ''}<button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')">Kick</button></td>`;

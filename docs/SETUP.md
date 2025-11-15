@@ -121,7 +121,7 @@ Install these (search by name):
 
 Open `devices/tracker/tracker.ino`
 
-Edit these lines (around line 35):
+Edit these lines (around line 50-52):
 ```cpp
 const char* WIFI_SSID = "YOUR_WIFI_NAME";
 const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";

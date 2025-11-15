@@ -53,7 +53,7 @@ const unsigned long PING_INTERVAL = 5000;
 const unsigned long BEACON_INTERVAL = 3000;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 100;
 const unsigned long SCROLL_SPEED = 150;
-const unsigned long WIFI_RECONNECT_INTERVAL = 30000;
+const unsigned long WIFI_RECONNECT_INTERVAL = 15000;  // Faster reconnect
 const unsigned long NOTIFICATION_DURATION = 3000;
 const unsigned long SERVER_TIMEOUT_THRESHOLD = 45000;
 const unsigned long EMERGENCY_HOLD_TIME = 2000;
@@ -249,6 +249,14 @@ void displayMain() {
   if (inSafeZone) line4 += " | SAFE";
   display.drawString(0, 36, line4);
   
+  // Show battery if available
+  float batt = getBatteryVoltage();
+  if (batt > 2.5 && batt < 4.5) {
+    String battStr = String(batt, 1) + "V";
+    int battX = 128 - display.getStringWidth(battStr);
+    display.drawString(battX, 36, battStr);
+  }
+  
   String line5 = "";
   if (playerRssi.size() == 0) line5 = "No players nearby";
   else {
@@ -426,6 +434,16 @@ void pingServer() {
       serverReachable = false;
       showNotification("Server connection lost", "warning");
     }
+    // Log specific HTTP errors
+    if (code < 0) {
+      Serial.println("HTTP Error: " + http.errorToString(code));
+    } else if (code == 404) {
+      Serial.println("Server endpoint not found (404)");
+    } else if (code == 500) {
+      Serial.println("Server internal error (500)");
+    } else {
+      Serial.println("HTTP Code: " + String(code));
+    }
   }
   http.end();
   playerRssi.clear();
@@ -433,17 +451,22 @@ void pingServer() {
 }
 
 void attemptCapture() {
-  if (myRole != "pred") { showNotification("Only predators can capture", "warning"); return; }
-  if (gamePhase != "running") { showNotification("Game not active", "warning"); return; }
-  if (emergencyActive) { showNotification("Game paused for emergency", "warning"); return; }
-  if (playerRssi.empty()) { showNotification("No targets in range", "info"); return; }
+  if (myRole != "pred") { showNotification("Only predators capture", "warning"); return; }
+  if (gamePhase != "running") { showNotification("Game not active!", "warning"); return; }
+  if (emergencyActive) { showNotification("EMERGENCY - No captures!", "danger"); return; }
+  if (inSafeZone) { showNotification("Can't capture from safe zone", "warning"); return; }
+  if (playerRssi.empty()) { showNotification("No prey detected nearby", "info"); return; }
   
   int bestRssi = -999; String targetId = "";
   for (auto& p : playerRssi) {
     if (p.second > bestRssi) { bestRssi = p.second; targetId = p.first; }
   }
   captureAttempts++;
-  showNotification("Attempting capture...", "info");
+  if (photoRequired) {
+    showNotification("Capturing... (Photo required!)", "warning");
+  } else {
+    showNotification("Attempting capture...", "info");
+  }
   
   StaticJsonDocument<256> doc;
   doc["pred_id"] = NODE_ID; doc["prey_id"] = targetId; doc["rssi"] = bestRssi;
@@ -516,9 +539,27 @@ void handleButton() {
     if (!emergencyHoldComplete && holdTime < EMERGENCY_HOLD_TIME) {
       if (myRole == "pred") attemptCapture();
       else if (myRole == "prey") {
-        if (myStatus == "captured") showNotification("Find safe zone to escape!", "info");
-        else if (inSafeZone) showNotification("You're safe here", "success");
-        else showNotification("Stay alert! Hide or find safe zone", "info");
+        if (myStatus == "captured") {
+          if (infectionMode) {
+            showNotification("INFECTED! You're now a predator!", "danger");
+          } else {
+            showNotification("CAPTURED! Find safe zone NOW!", "danger");
+          }
+        } else if (inSafeZone) {
+          showNotification("SAFE! Recover here. " + String(playerRssi.size()) + " nearby", "success");
+        } else if (playerRssi.size() > 0) {
+          int closest = -999;
+          for (auto& p : playerRssi) {
+            if (p.second > closest) closest = p.second;
+          }
+          if (closest > -60) {
+            showNotification("DANGER! Predator very close!", "danger");
+          } else {
+            showNotification("Threat nearby (" + String(closest) + "dB)", "warning");
+          }
+        } else {
+          showNotification("Safe for now. Stay alert!", "info");
+        }
       } else showNotification("Set role at " + String(SERVER_URL), "info");
     }
     btnHeld = true;
@@ -598,6 +639,27 @@ void setup() {
   showNotification("Open browser to set your role", "info");
 }
 
+float getBatteryVoltage() {
+  // Heltec V3 battery monitoring on ADC pin
+  // Note: This is approximate, may need calibration
+  int adcValue = analogRead(1);  // ADC1 for battery
+  float voltage = (adcValue / 4095.0) * 3.3 * 2;  // Voltage divider
+  return voltage;
+}
+
+void checkBattery() {
+  float voltage = getBatteryVoltage();
+  static bool lowBatteryWarned = false;
+  
+  if (voltage < 3.3 && !lowBatteryWarned) {
+    showNotification("LOW BATTERY! Charge soon!", "danger");
+    lowBatteryWarned = true;
+    Serial.println("Battery low: " + String(voltage) + "V");
+  } else if (voltage > 3.5) {
+    lowBatteryWarned = false;
+  }
+}
+
 void loop() {
   unsigned long now = millis();
   receivePackets();
@@ -614,6 +676,7 @@ void loop() {
   if (now - lastMemCheck > 300000) {
     lastMemCheck = now;
     Serial.println("Free heap: " + String(ESP.getFreeHeap()) + " bytes");
+    checkBattery();  // Also check battery
   }
   
   delay(10);

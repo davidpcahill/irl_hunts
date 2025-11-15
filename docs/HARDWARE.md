@@ -292,6 +292,15 @@ Tools → Board → ESP32 Arduino → "Heltec WiFi LoRa 32(V3)"
 
 **Monitor battery during game!**
 
+### Battery Voltage Monitoring
+The Heltec V3 can monitor battery voltage:
+- Full charge: ~4.2V
+- Normal: 3.7-4.0V
+- Low warning: <3.3V
+- Critical: <3.0V
+
+Tracker firmware includes automatic low battery warnings.
+
 ---
 
 ## 📊 Performance Tuning

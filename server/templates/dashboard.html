@@ -621,6 +621,11 @@
                     📸 <strong>Photo Safari Mode:</strong> You must photograph prey before you can capture them!
                 </div>
                 
+                <div id="photographed-prey" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0,184,148,0.1); border: 1px solid rgba(0,184,148,0.3); border-radius: 8px; font-size: 12px;">
+                    <strong style="color: #00b894;">📷 Can Capture:</strong>
+                    <div id="photographed-list" style="margin-top: 5px; color: #ccc;">None yet</div>
+                </div>
+                
                 <div style="margin-top: 15px;">
                     {% if player.role == 'unassigned' %}
                     <p style="color: #feca57; margin-bottom: 10px;">Choose your role:</p>
@@ -981,9 +986,13 @@
                 document.getElementById('team-row').style.display = 'none';
             }
             
-            // Captured overlay
-            if (player.status === 'captured' && !capturedDismissed && !modeConfig.infection) {
-                document.getElementById('captured-overlay').classList.add('active');
+            // Captured overlay - don't show in infection mode (instant conversion)
+            if (player.status === 'captured' && !capturedDismissed) {
+                if (!modeConfig.infection) {
+                    document.getElementById('captured-overlay').classList.add('active');
+                }
+            } else {
+                document.getElementById('captured-overlay').classList.remove('active');
             }
             
             // Photo requirement display
@@ -1003,6 +1012,11 @@
         let lastKnownStatus = playerData.status;
         
         async function setRole(role) {
+            const roleNames = { pred: 'Predator 🦊', prey: 'Prey 🐰' };
+            if (!confirm(`Become a ${roleNames[role]}?\n\nThis determines your objective for the game!`)) {
+                return;
+            }
+            
             try {
                 const resp = await fetch('/api/player', {
                     method: 'PUT',
@@ -1191,6 +1205,30 @@
             }
         }
         
+        async function loadPhotographedPrey() {
+            if (!modeConfig.photo_required || playerData.role !== 'pred') {
+                document.getElementById('photographed-prey').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const resp = await fetch('/api/player/photos');
+                const photos = await resp.json();
+                const container = document.getElementById('photographed-prey');
+                const list = document.getElementById('photographed-list');
+                
+                if (photos.length > 0) {
+                    container.style.display = 'block';
+                    list.innerHTML = photos.map(p => `<span style="background: rgba(0,184,148,0.3); padding: 2px 8px; border-radius: 10px; margin: 2px; display: inline-block;">${escapeHtml(p.name)}</span>`).join(' ');
+                } else {
+                    container.style.display = 'block';
+                    list.innerHTML = '<em>None yet - photograph prey first!</em>';
+                }
+            } catch (err) {
+                console.error('Failed to load photographed prey:', err);
+            }
+        }
+        
         async function loadPlayers() {
             try {
                 const resp = await fetch('/api/players');
@@ -1354,6 +1392,7 @@
                     notify(`Sighting recorded! +${data.points} points`, 'success');
                     closeSightingModal();
                     loadGallery();
+                    loadPhotographedPrey();  // Refresh photo list
                     photoInput.value = '';
                 } else {
                     const data = await resp.json();
@@ -1437,6 +1476,7 @@
         loadMessages();
         loadGallery();
         updateModeDisplay();
+        loadPhotographedPrey();
         
         // Periodic updates
         setInterval(loadGameState, 3000);
