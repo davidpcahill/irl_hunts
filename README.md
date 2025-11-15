@@ -84,9 +84,9 @@ Server runs at `http://YOUR_IP:5000`
 ### 2. Flash Trackers (10 minutes each)
 
 1. Install Arduino IDE libraries:
-   - **ESP8266 and ESP32 OLED driver** by ThingPulse
+   - **ESP8266 and ESP32 OLED driver for SSD1306 displays** by ThingPulse
    - **RadioLib** by Jan Gromes
-   - **ArduinoJson** by Benoit Blanchon
+   - **ArduinoJson** by Benoit Blanchon (version 6.x or 7.x)
 
 2. Edit `devices/tracker/tracker.ino`:
    ```cpp

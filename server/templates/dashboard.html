@@ -823,6 +823,11 @@
         socket.on('player_update', (player) => {
             if (player.device_id === playerId) {
                 updateMyStatus(player);
+                // Reset dismissed flag if status changed from captured
+                if (lastKnownStatus === 'captured' && player.status !== 'captured') {
+                    capturedDismissed = false;
+                }
+                lastKnownStatus = player.status;
             }
             loadPlayers();
             loadLeaderboard();
@@ -993,6 +998,9 @@
             document.getElementById('captured-overlay').classList.remove('active');
             capturedDismissed = true;
         }
+        
+        // Reset dismiss flag when status changes
+        let lastKnownStatus = playerData.status;
         
         async function setRole(role) {
             try {

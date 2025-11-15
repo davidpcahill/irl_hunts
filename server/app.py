@@ -49,6 +49,7 @@ ADMIN_PASSWORD = "hunt2024!"
 DEFAULT_CAPTURE_RSSI = -70
 DEFAULT_SAFEZONE_RSSI = -75
 SIGHTING_POINTS = 25
+SIGHTING_COOLDOWN = 30  # Seconds between sightings of same target
 CAPTURE_COOLDOWN = 10
 PLAYER_TIMEOUT = 30
 
@@ -174,6 +175,7 @@ messages = []
 moderators = set()
 bounties = {}
 capture_cooldowns = {}
+sighting_cooldowns = {}  # Track sighting cooldowns per player-target pair
 team_scores = {"Alpha": 0, "Beta": 0, "Gamma": 0, "Delta": 0}
 event_counter = 0
 background_thread_stop = False
@@ -279,6 +281,13 @@ def calculate_points(player):
             prey_count = len([p for p in players.values() if p["role"] == "prey"])
             if prey_count == 1 and player["role"] == "prey":
                 pts += mode_config["survival_bonus"]
+    
+    # Team winning bonus (calculated at game end)
+    if mode_config["team_mode"] and game["phase"] == "ended" and player.get("team"):
+        if team_scores:
+            winning_team = max(team_scores, key=team_scores.get)
+            if player["team"] == winning_team and team_scores[winning_team] > 0:
+                pts += 300  # Winning team bonus per member
     
     player["points"] = pts
     return pts
@@ -868,6 +877,16 @@ def api_upload_sighting():
     if player["role"] == "prey" and target["role"] != "pred":
         return jsonify({"error": "Prey can only spot preds"}), 400
     
+    # Check sighting cooldown for this specific target
+    cooldown_key = f"{device_id}_{target_id}"
+    current_time = time.time()
+    if cooldown_key in sighting_cooldowns:
+        time_since_last = current_time - sighting_cooldowns[cooldown_key]
+        if time_since_last < SIGHTING_COOLDOWN:
+            remaining = int(SIGHTING_COOLDOWN - time_since_last)
+            return jsonify({"error": f"Wait {remaining}s before spotting {target['name']} again"}), 400
+    sighting_cooldowns[cooldown_key] = current_time
+    
     if 'photo' not in request.files:
         return jsonify({"error": "No photo"}), 400
     
@@ -1030,6 +1049,13 @@ def api_add_beacon():
     
     if not beacon_id:
         return jsonify({"error": "ID required"}), 400
+    
+    if len(beacon_id) < 4 or len(beacon_id) > 10:
+        return jsonify({"error": "Beacon ID must be 4-10 characters"}), 400
+    
+    rssi = int(rssi)
+    if rssi > -30 or rssi < -100:
+        return jsonify({"error": "RSSI threshold must be between -100 and -30"}), 400
     
     beacons[beacon_id] = {"name": name, "rssi": rssi, "active": True}
     log_event("beacon_add", {"id": beacon_id, "name": name, "rssi": rssi})
@@ -1256,6 +1282,7 @@ def api_reset_game():
         team_scores[team] = 0
     
     capture_cooldowns.clear()
+    sighting_cooldowns.clear()
     log_event("game_reset", {})
     notify_all_players("Game reset to lobby", "info")
     socketio.emit("game_reset", {}, room="all")

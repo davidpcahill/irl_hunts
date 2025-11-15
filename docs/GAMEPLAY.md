@@ -196,7 +196,7 @@ The Emergency System is a **critical safety feature** that takes absolute priori
 ### How to Trigger Emergency
 
 **From Tracker Device:**
-- Hold PRG button for 3 seconds
+- Hold PRG button for 2 seconds
 - Then press button 3 times quickly
 - Screen shows "EMERGENCY SENDING..."
 - LED flashes rapidly in red
@@ -535,7 +535,7 @@ Same as Classic, but survival bonus = +500
 |--------|----------|
 | Single Press (Pred) | Attempt capture |
 | Single Press (Prey) | Show status info |
-| Hold 3s + 3 presses | EMERGENCY |
+| Hold 2s + 3 taps | EMERGENCY |
 | Single Press (Unassigned) | Show setup URL |
 
 ### Common RSSI Values

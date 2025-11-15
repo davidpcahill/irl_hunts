@@ -429,6 +429,7 @@ void pingServer() {
   }
   http.end();
   playerRssi.clear();
+  beaconRssi.clear(); // Clear to prevent memory buildup
 }
 
 void attemptCapture() {
@@ -607,5 +608,13 @@ void loop() {
     lastDisplayUpdate = now; updateScroll(); displayMain();
   }
   updateLED();
+  
+  // Memory monitoring (every 5 minutes)
+  static unsigned long lastMemCheck = 0;
+  if (now - lastMemCheck > 300000) {
+    lastMemCheck = now;
+    Serial.println("Free heap: " + String(ESP.getFreeHeap()) + " bytes");
+  }
+  
   delay(10);
 }
