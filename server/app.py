@@ -752,9 +752,10 @@ def api_get_notifications():
 @app.route("/api/emergency", methods=["POST"])
 @login_required
 def api_trigger_emergency():
+    """Player triggers emergency for themselves (so they can be found)"""
     device_id = session["device_id"]
     if device_id == "ADMIN":
-        return jsonify({"error": "Admin cannot trigger emergency"}), 400
+        return jsonify({"error": "Admin cannot trigger emergency - use /api/emergency/admin instead"}), 400
     
     data = request.json or {}
     reason = str(data.get("reason", "Emergency button pressed"))[:200]
@@ -763,6 +764,44 @@ def api_trigger_emergency():
     if success:
         return jsonify({"success": True, "message": msg})
     return jsonify({"error": msg}), 400
+
+@app.route("/api/emergency/admin", methods=["POST"])
+@mod_required
+def api_admin_trigger_emergency():
+    """Admin/mod can trigger emergency for a specific player or as system alert"""
+    data = request.json or {}
+    target_id = data.get("target_id", "").strip().upper()
+    reason = str(data.get("reason", "Admin triggered emergency"))[:200]
+    
+    # If target_id specified, trigger for that player
+    if target_id and target_id in players:
+        success, msg = trigger_emergency(target_id, reason)
+        return jsonify({"success": success, "message": msg})
+    
+    # Otherwise, trigger as system-wide emergency
+    game["emergency"] = True
+    game["emergency_by"] = "SYSTEM (Admin)"
+    game["emergency_reason"] = reason
+    game["emergency_time"] = now()
+    
+    if game["phase"] == "running":
+        game["phase"] = "paused"
+    
+    emergency_data = {
+        "player_name": "SYSTEM (Admin)",
+        "device_id": "ADMIN",
+        "reason": reason,
+        "location_hint": "Admin triggered - check all areas",
+        "nearby_players": [],
+        "nearest_to_emergency": [],
+        "time": now_str()
+    }
+    
+    log_event("emergency_triggered", emergency_data)
+    notify_all_players(f"🚨 EMERGENCY! {reason}", "danger")
+    socketio.emit("emergency_alert", emergency_data, room="all")
+    
+    return jsonify({"success": True, "message": "Emergency triggered by admin"})
 
 @app.route("/api/emergency/clear", methods=["POST"])
 @mod_required

@@ -416,11 +416,9 @@
             <h3>🚨 EMERGENCY SITUATION</h3>
             <div class="emergency-details">
                 <p><strong>Triggered By:</strong> <span id="emergency-player">Unknown</span></p>
-                <p><strong>Player ID:</strong> <span id="emergency-player-id">Unknown</span></p>
                 <p><strong>Reason:</strong> <span id="emergency-reason">Not specified</span></p>
                 <p><strong>Time:</strong> <span id="emergency-time">--:--:--</span></p>
                 <p><strong>Last Known Location:</strong> <span id="emergency-location">Checking...</span></p>
-                <p><strong>Last Seen By:</strong> <span id="emergency-last-seen">Checking...</span></p>
                 <p><strong>Nearest Players:</strong> <span id="emergency-nearest">Calculating...</span></p>
             </div>
             <button class="btn btn-clear-emergency" onclick="clearEmergency()">✅ Clear Emergency & Resume Game</button>
@@ -450,6 +448,7 @@
                     <option value="infection">Infection Mode ⚠️</option>
                     <option value="photo_safari">Photo Safari 📸</option>
                 </select>
+                <button class="btn btn-primary" onclick="setGameMode()">Apply Mode</button>
                 <div id="mode-description" class="mode-description">
                     <h4>Classic Hunt</h4>
                     <ul>
@@ -490,7 +489,7 @@
                     <button class="btn btn-emergency" onclick="triggerEmergency()">🚨 TRIGGER EMERGENCY</button>
                     <button class="btn btn-clear-emergency" onclick="clearEmergency()" id="clear-emergency-btn" disabled>✅ Clear Emergency</button>
                 </div>
-                <p style="color: #888; font-size: 11px;">Emergency pauses game for ALL players and alerts everyone to find the player in need.</p>
+                <p style="color: #888; font-size: 11px;">Emergency pauses game for ALL players and alerts everyone. You can trigger for a specific player or system-wide.</p>
             </div>
         </div>
         
@@ -624,8 +623,10 @@
         socket.on('infection', (data) => { notify(`🦠 ${data.prey} INFECTED! Now hunting as predator!`); });
         socket.on('game_started', () => { notify('🎮 Game started!'); loadGameState(); });
         socket.on('game_ended', () => { notify('🏁 Game ended!'); loadGameState(); });
-        socket.on('emergency', (data) => { emergencyActive = true; showEmergencyInfo(data); notify('🚨 EMERGENCY TRIGGERED!'); });
+        socket.on('game_reset', () => { notify('🔄 Game reset!'); loadGameState(); loadPlayers(); });
+        socket.on('emergency_alert', (data) => { emergencyActive = true; showEmergencyInfo(data); notify('🚨 EMERGENCY TRIGGERED!'); });
         socket.on('emergency_cleared', () => { emergencyActive = false; hideEmergencyInfo(); notify('✅ Emergency cleared'); });
+        socket.on('mode_change', (data) => { currentGameMode = data.mode; updateModeDescription(); notify(`Mode changed to: ${data.config.name}`); });
         
         function notify(msg) { const notif = document.createElement('div'); notif.className = 'notification'; notif.textContent = msg; document.body.appendChild(notif); setTimeout(() => notif.remove(), 3000); }
         
@@ -658,12 +659,13 @@
             document.getElementById('emergency-info').classList.add('active');
             document.getElementById('clear-emergency-btn').disabled = false;
             document.getElementById('emergency-player').textContent = data.player_name || 'Unknown';
-            document.getElementById('emergency-player-id').textContent = data.player_id || 'Unknown';
             document.getElementById('emergency-reason').textContent = data.reason || 'Not specified';
             document.getElementById('emergency-time').textContent = data.time || '--:--:--';
-            document.getElementById('emergency-location').textContent = data.last_location || 'Unknown';
-            document.getElementById('emergency-last-seen').textContent = data.last_seen_by || 'No recent sightings';
-            document.getElementById('emergency-nearest').textContent = data.nearest_players || 'Calculating...';
+            document.getElementById('emergency-location').textContent = data.location_hint || 'Unknown';
+            const nearestList = data.nearest_to_emergency || [];
+            document.getElementById('emergency-nearest').textContent = nearestList.length > 0 
+                ? nearestList.map(p => `${p.name} (${p.rssi}dB)`).join(', ')
+                : 'No players detected nearby';
         }
         
         function hideEmergencyInfo() {
@@ -676,7 +678,7 @@
             const log = document.getElementById('events-log');
             const div = document.createElement('div');
             div.className = 'event';
-            if (event.type === 'emergency' || event.type === 'emergency_triggered') div.classList.add('emergency');
+            if (event.type === 'emergency_triggered') div.classList.add('emergency');
             let dataStr = '';
             try { dataStr = JSON.stringify(event.data); if (dataStr.length > 100) dataStr = dataStr.substring(0, 100) + '...'; } catch (e) { dataStr = String(event.data); }
             div.innerHTML = `<span class="event-time">${event.time_str || '--:--:--'}</span> <span class="event-type">${event.type.toUpperCase()}</span> ${dataStr}`;
@@ -718,7 +720,7 @@
                     document.getElementById('stat-time').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
                 } else document.getElementById('stat-time').textContent = '--:--';
                 if (state.mode) { currentGameMode = state.mode; document.getElementById('game-mode').value = state.mode; updateModeDescription(); }
-                if (state.emergency) { emergencyActive = true; document.getElementById('emergency-banner').classList.add('active'); document.getElementById('clear-emergency-btn').disabled = false; } else { emergencyActive = false; hideEmergencyInfo(); }
+                if (state.emergency) { emergencyActive = true; document.getElementById('emergency-banner').classList.add('active'); document.getElementById('clear-emergency-btn').disabled = false; loadEmergencyStatus(); } else { emergencyActive = false; hideEmergencyInfo(); }
                 if (state.settings) {
                     document.getElementById('setting-honor').checked = state.settings.honor_system;
                     document.getElementById('setting-rolechange').checked = state.settings.allow_role_change;
@@ -727,6 +729,22 @@
                 }
                 document.getElementById('game-mode').disabled = state.phase !== 'lobby';
             } catch (err) { console.error('Failed to load game state:', err); }
+        }
+        
+        async function loadEmergencyStatus() {
+            try {
+                const resp = await fetch('/api/emergency/status');
+                const data = await resp.json();
+                if (data.emergency) {
+                    showEmergencyInfo({
+                        player_name: data.by,
+                        reason: data.reason,
+                        location_hint: data.location_hint,
+                        time: data.time,
+                        nearest_to_emergency: data.nearest_players.map(p => ({name: p.name, rssi: p.rssi}))
+                    });
+                }
+            } catch (err) { console.error('Failed to load emergency status:', err); }
         }
         
         async function loadPlayers() {
@@ -751,13 +769,58 @@
         async function loadEvents() { try { const resp = await fetch('/api/events?limit=50'); const eventList = await resp.json(); eventList.reverse().forEach(addEvent); } catch (err) { console.error('Failed to load events:', err); } }
         
         async function sendAdminMessage() { const input = document.getElementById('admin-message'); const message = input.value.trim(); if (!message) return; try { const resp = await fetch('/api/messages', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({to: 'all', message: message}) }); if (resp.ok) { input.value = ''; notify('Message broadcast to all players'); } else { const data = await resp.json(); notify('Error: ' + (data.error || 'Failed to send')); } } catch (err) { notify('Failed to send message'); } }
-        async function startGame() { const duration = parseInt(document.getElementById('game-duration').value); const countdown = parseInt(document.getElementById('game-countdown').value); const mode = document.getElementById('game-mode').value; try { const resp = await fetch('/api/game/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration, countdown, mode}) }); if (resp.ok) notify('Game starting!'); else { const data = await resp.json(); notify('Error: ' + data.error); } } catch (err) { notify('Failed to start game'); } }
+        
+        async function setGameMode() {
+            const mode = document.getElementById('game-mode').value;
+            try {
+                const resp = await fetch('/api/game/mode', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({mode})
+                });
+                if (resp.ok) {
+                    notify(`Game mode set to: ${modeDescriptions[mode].name}`);
+                    loadGameState();
+                } else {
+                    const data = await resp.json();
+                    notify('Error: ' + (data.error || 'Failed to set mode'));
+                }
+            } catch (err) {
+                notify('Failed to set game mode');
+            }
+        }
+        
+        async function startGame() { const duration = parseInt(document.getElementById('game-duration').value); const countdown = parseInt(document.getElementById('game-countdown').value); try { const resp = await fetch('/api/game/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration, countdown}) }); if (resp.ok) notify('Game starting!'); else { const data = await resp.json(); notify('Error: ' + data.error); } } catch (err) { notify('Failed to start game'); } }
         async function pauseGame() { await fetch('/api/game/pause', {method: 'POST'}); notify('Game paused'); }
-        async function resumeGame() { if (emergencyActive) { notify('Cannot resume - Emergency still active!'); return; } await fetch('/api/game/resume', {method: 'POST'}); notify('Game resumed'); }
+        async function resumeGame() { if (emergencyActive) { notify('Cannot resume - Emergency still active!'); return; } const resp = await fetch('/api/game/resume', {method: 'POST'}); if (!resp.ok) { const data = await resp.json(); notify('Error: ' + data.error); } else { notify('Game resumed'); } }
         async function endGame() { if (confirm('End game now?')) { await fetch('/api/game/end', {method: 'POST'}); notify('Game ended'); } }
         async function resetGame() { if (confirm('Reset ALL game data? This clears scores!')) { await fetch('/api/game/reset', {method: 'POST'}); notify('Game reset'); loadGameState(); loadPlayers(); } }
         
-        async function triggerEmergency() { const reason = prompt('Emergency reason (optional):'); try { const resp = await fetch('/api/emergency', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ reason: reason || 'Admin triggered emergency', triggered_by: 'ADMIN' }) }); if (resp.ok) { notify('🚨 EMERGENCY TRIGGERED - Game Paused'); loadGameState(); } else { const data = await resp.json(); notify('Error: ' + (data.error || 'Failed to trigger emergency')); } } catch (err) { notify('Failed to trigger emergency'); } }
+        async function triggerEmergency() {
+            const reason = prompt('Emergency reason (optional):');
+            const targetId = prompt('Target player ID (leave empty for system-wide alert):');
+            
+            try {
+                const resp = await fetch('/api/emergency/admin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        reason: reason || 'Admin triggered emergency',
+                        target_id: targetId || ''
+                    })
+                });
+                if (resp.ok) { 
+                    notify('🚨 EMERGENCY TRIGGERED - Game Paused'); 
+                    loadGameState(); 
+                } else { 
+                    const data = await resp.json(); 
+                    notify('Error: ' + (data.error || 'Failed to trigger emergency')); 
+                }
+            } catch (err) { 
+                notify('Failed to trigger emergency'); 
+            }
+        }
+        
         async function clearEmergency() { if (confirm('Clear emergency and resume game?')) { try { const resp = await fetch('/api/emergency/clear', { method: 'POST', headers: {'Content-Type': 'application/json'} }); if (resp.ok) { notify('✅ Emergency cleared'); hideEmergencyInfo(); loadGameState(); } else { const data = await resp.json(); notify('Error: ' + (data.error || 'Failed to clear emergency')); } } catch (err) { notify('Failed to clear emergency'); } } }
         async function updateSettings() { const settings = { honor_system: document.getElementById('setting-honor').checked, allow_role_change: document.getElementById('setting-rolechange').checked, capture_rssi: parseInt(document.getElementById('setting-capture-rssi').value) }; try { await fetch('/api/game/settings', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(settings) }); notify('Settings updated'); } catch (err) { notify('Failed to update settings'); } }
         async function addBeacon() { const beaconId = document.getElementById('beacon-id').value.trim().toUpperCase(); const name = document.getElementById('beacon-name').value.trim() || beaconId; const rssi = parseInt(document.getElementById('beacon-rssi').value); if (!beaconId) { notify('Enter beacon ID'); return; } try { const resp = await fetch('/api/beacons', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: beaconId, name: name, rssi: rssi}) }); if (resp.ok) { notify('Beacon added'); loadBeacons(); document.getElementById('beacon-id').value = ''; document.getElementById('beacon-name').value = ''; } else { const data = await resp.json(); notify('Error: ' + (data.error || 'Failed to add')); } } catch (err) { notify('Failed to add beacon'); } }
