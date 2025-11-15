@@ -41,9 +41,9 @@
 // =========================
 #define LORA_FREQ   915.0
 
-const char* WIFI_SSID = "YOUR_WIFI_NAME";        // ← CHANGE THIS
-const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";    // ← CHANGE THIS
-const char* SERVER_URL = "http://192.168.1.100:5000";  // ← CHANGE TO YOUR SERVER IP
+const char* WIFI_SSID = "furbidden";        // ← CHANGE THIS
+const char* WIFI_PASS = "!b4rka11day4now-";    // ← CHANGE THIS
+const char* SERVER_URL = "http://wolftop.furbidden.com:5000";  // ← CHANGE TO YOUR SERVER IP
 
 const unsigned long PING_INTERVAL = 5000;
 const unsigned long BEACON_INTERVAL = 3000;

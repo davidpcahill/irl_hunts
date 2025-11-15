@@ -952,7 +952,7 @@
                 gallery.innerHTML = '<p style="color: #888; text-align: center; grid-column: 1/-1;">No photos yet</p>';
             } else {
                 gallery.innerHTML = sightings.slice(0, 20).map(s => `
-                    <img src="${s.photo}" title="${s.spotter_name} spotted ${s.target_name}" onclick="window.open('${s.photo}')">
+                    <img src="${s.photo}" title="${s.spotter} spotted ${s.target}" onclick="window.open('${s.photo}')">
                 `).join('');
             }
         }

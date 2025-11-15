@@ -179,6 +179,39 @@
         .event-time { color: #888; }
         .event-type { color: #feca57; font-weight: 600; }
         
+        .chat-log {
+            background: #000;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+        
+        .chat-msg {
+            padding: 8px;
+            border-left: 3px solid #48dbfb;
+            margin-bottom: 8px;
+            padding-left: 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .chat-msg.team-pred { border-left-color: #ff7675; }
+        .chat-msg.team-prey { border-left-color: #00cec9; }
+        .chat-msg.admin { border-left-color: #6c5ce7; }
+        
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        
+        .chat-from { color: #48dbfb; font-weight: 600; }
+        .chat-to { color: #888; font-size: 11px; }
+        .chat-time { color: #666; font-size: 11px; }
+        .chat-content { color: #ccc; }
+        
         input, select {
             padding: 10px;
             border: 1px solid rgba(108,92,231,0.3);
@@ -234,23 +267,6 @@
         .logout-btn:hover {
             background: #a29bfe;
             color: #000;
-        }
-        
-        .alert {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            animation: flash 1s infinite;
-        }
-        
-        .alert-emergency {
-            background: rgba(214,48,49,0.3);
-            border: 2px solid #d63031;
-        }
-        
-        @keyframes flash {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
         
         .settings-toggle {
@@ -346,6 +362,16 @@
             border-radius: 8px;
             cursor: pointer;
         }
+        
+        .chat-input-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .chat-input-row input {
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -358,9 +384,6 @@
     </div>
     
     <div class="container">
-        <!-- Alerts -->
-        <div id="alerts"></div>
-        
         <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-box">
@@ -382,6 +405,10 @@
             <div class="stat-box">
                 <div class="stat-value" id="stat-online">0</div>
                 <div class="stat-label">Online</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-captured">0</div>
+                <div class="stat-label">Captured</div>
             </div>
             <div class="stat-box">
                 <div class="stat-value" id="stat-phase">LOBBY</div>
@@ -407,24 +434,28 @@
             <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                 <div class="form-group">
                     <label>Duration (min)</label>
-                    <input type="number" id="game-duration" value="30" min="5" max="120" style="width: 100px;">
+                    <input type="number" id="game-duration" value="30" min="5" max="180" style="width: 100px;">
                 </div>
                 <div class="form-group">
                     <label>Countdown (sec)</label>
                     <input type="number" id="game-countdown" value="10" min="5" max="60" style="width: 100px;">
                 </div>
             </div>
-            
-            <div class="form-group">
-                <label>Broadcast Announcement</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="announcement" placeholder="Message to all players..." style="flex: 1;">
-                    <button class="btn btn-primary" onclick="sendAnnouncement()">📢 Send</button>
-                </div>
-            </div>
         </div>
         
         <div class="grid">
+            <!-- Chat Monitor - ADMIN SEES ALL -->
+            <div class="card">
+                <h2>💬 All Chat Messages</h2>
+                <div id="chat-log" class="chat-log">
+                    <div class="chat-msg">Waiting for messages...</div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" id="admin-message" placeholder="Broadcast to all players..." maxlength="500">
+                    <button class="btn btn-primary" onclick="sendAdminMessage()">📢 Send</button>
+                </div>
+            </div>
+            
             <!-- Players -->
             <div class="card">
                 <h2>👥 Players</h2>
@@ -465,14 +496,6 @@
                            oninput="document.getElementById('rssi-val').textContent = this.value">
                 </div>
                 <button class="btn btn-success" onclick="addBeacon()">Add Safe Zone</button>
-                
-                <div style="margin-top: 15px; padding: 10px; background: rgba(72,219,251,0.1); border-radius: 8px; font-size: 12px;">
-                    <strong>📍 Setup:</strong><br>
-                    1. Flash <code>beacon.ino</code> to a Heltec V3<br>
-                    2. Place at safe zone location<br>
-                    3. Note ID from its OLED screen<br>
-                    4. Add here with range settings
-                </div>
             </div>
             
             <!-- Game Settings -->
@@ -555,16 +578,51 @@
     <script>
         const socket = io();
         
-        socket.on('connect', () => console.log('Admin connected'));
+        socket.on('connect', () => {
+            console.log('Admin connected to server');
+            notify('Connected to server');
+        });
         
-        socket.on('game_event', (event) => {
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            notify('Disconnected from server');
+        });
+        
+        socket.on('event', (event) => {
             addEvent(event);
             loadGameState();
             loadPlayers();
         });
         
-        socket.on('player_updated', () => loadPlayers());
-        socket.on('sighting_event', () => loadSightings());
+        socket.on('message', (msg) => {
+            addChatMessage(msg);
+        });
+        
+        socket.on('player_update', () => {
+            loadPlayers();
+        });
+        
+        socket.on('sighting', () => {
+            loadSightings();
+        });
+        
+        socket.on('capture', (data) => {
+            notify(`🎯 ${data.pred} captured ${data.prey}!`);
+        });
+        
+        socket.on('escape', (data) => {
+            notify(`🏃 ${data.prey} escaped!`);
+        });
+        
+        socket.on('game_started', () => {
+            notify('🎮 Game started!');
+            loadGameState();
+        });
+        
+        socket.on('game_ended', () => {
+            notify('🏁 Game ended!');
+            loadGameState();
+        });
         
         function notify(msg) {
             const notif = document.createElement('div');
@@ -578,10 +636,21 @@
             const log = document.getElementById('events-log');
             const div = document.createElement('div');
             div.className = 'event';
+            
+            let dataStr = '';
+            try {
+                dataStr = JSON.stringify(event.data);
+                if (dataStr.length > 100) {
+                    dataStr = dataStr.substring(0, 100) + '...';
+                }
+            } catch (e) {
+                dataStr = String(event.data);
+            }
+            
             div.innerHTML = `
-                <span class="event-time">${event.time_str}</span>
+                <span class="event-time">${event.time_str || '--:--:--'}</span>
                 <span class="event-type">${event.type.toUpperCase()}</span>
-                ${JSON.stringify(event.data)}
+                ${dataStr}
             `;
             log.insertBefore(div, log.firstChild);
             
@@ -590,138 +659,253 @@
             }
         }
         
-        async function loadGameState() {
-            const resp = await fetch('/api/game');
-            const state = await resp.json();
+        function addChatMessage(msg) {
+            const log = document.getElementById('chat-log');
             
-            document.getElementById('stat-players').textContent = state.player_count;
-            document.getElementById('stat-preds').textContent = state.pred_count;
-            document.getElementById('stat-prey').textContent = state.prey_count;
-            document.getElementById('stat-ready').textContent = state.ready_count;
-            document.getElementById('stat-online').textContent = state.online_count;
-            document.getElementById('stat-phase').textContent = state.phase.toUpperCase();
-            
-            if (state.time_remaining > 0) {
-                const m = Math.floor(state.time_remaining / 60);
-                const s = state.time_remaining % 60;
-                document.getElementById('stat-time').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-            } else {
-                document.getElementById('stat-time').textContent = '--:--';
+            // Remove "waiting" message if present
+            if (log.children.length === 1 && log.firstChild.textContent.includes('Waiting')) {
+                log.innerHTML = '';
             }
             
-            // Update settings toggles
-            document.getElementById('setting-honor').checked = state.settings.honor_system;
-            document.getElementById('setting-rolechange').checked = state.settings.allow_role_change_in_safezone;
-            document.getElementById('setting-capture-rssi').value = state.settings.capture_rssi_threshold;
-            document.getElementById('capture-rssi-val').textContent = state.settings.capture_rssi_threshold;
+            const div = document.createElement('div');
+            let msgClass = 'chat-msg';
+            if (msg.from_id === 'ADMIN') {
+                msgClass += ' admin';
+            } else if (msg.team === 'pred') {
+                msgClass += ' team-pred';
+            } else if (msg.team === 'prey') {
+                msgClass += ' team-prey';
+            }
+            
+            div.className = msgClass;
+            div.innerHTML = `
+                <div class="chat-header">
+                    <span class="chat-from">${msg.from_name}</span>
+                    <span class="chat-to">to: ${msg.to}${msg.team ? ' (' + msg.team + ')' : ''}</span>
+                    <span class="chat-time">${msg.time_str}</span>
+                </div>
+                <div class="chat-content">${escapeHtml(msg.message)}</div>
+            `;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+            
+            // Keep only last 100 messages
+            while (log.children.length > 100) {
+                log.removeChild(log.firstChild);
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function loadGameState() {
+            try {
+                const resp = await fetch('/api/game');
+                const state = await resp.json();
+                
+                document.getElementById('stat-players').textContent = state.player_count;
+                document.getElementById('stat-preds').textContent = state.pred_count;
+                document.getElementById('stat-prey').textContent = state.prey_count;
+                document.getElementById('stat-ready').textContent = state.ready_count;
+                document.getElementById('stat-online').textContent = state.online_count;
+                document.getElementById('stat-captured').textContent = state.captured_count || 0;
+                document.getElementById('stat-phase').textContent = state.phase.toUpperCase();
+                
+                if (state.time_remaining > 0) {
+                    const m = Math.floor(state.time_remaining / 60);
+                    const s = state.time_remaining % 60;
+                    document.getElementById('stat-time').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                } else {
+                    document.getElementById('stat-time').textContent = '--:--';
+                }
+                
+                // Update settings toggles
+                if (state.settings) {
+                    document.getElementById('setting-honor').checked = state.settings.honor_system;
+                    document.getElementById('setting-rolechange').checked = state.settings.allow_role_change;
+                    document.getElementById('setting-capture-rssi').value = state.settings.capture_rssi;
+                    document.getElementById('capture-rssi-val').textContent = state.settings.capture_rssi;
+                }
+            } catch (err) {
+                console.error('Failed to load game state:', err);
+            }
         }
         
         async function loadPlayers() {
-            const resp = await fetch('/api/players');
-            const players = await resp.json();
-            
-            const tbody = document.getElementById('players-table');
-            tbody.innerHTML = '';
-            
-            for (const [id, p] of Object.entries(players)) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td>
-                    <td>${id}</td>
-                    <td>${p.name}</td>
-                    <td>${p.role}</td>
-                    <td><span class="status-badge status-${p.status}">${p.status}</span></td>
-                    <td>${p.in_safe_zone ? '🏠' : ''}</td>
-                    <td>
-                        <button class="btn btn-small btn-primary" onclick="addMod('${id}')">+Mod</button>
-                        ${p.status === 'captured' ? `<button class="btn btn-small btn-success" onclick="releasePlayer('${id}')">Release</button>` : ''}
-                        <button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')">Kick</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
+            try {
+                const resp = await fetch('/api/players');
+                const players = await resp.json();
+                
+                const tbody = document.getElementById('players-table');
+                tbody.innerHTML = '';
+                
+                for (const [id, p] of Object.entries(players)) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td>
+                        <td>${id}</td>
+                        <td>${escapeHtml(p.name)}</td>
+                        <td>${p.role}</td>
+                        <td><span class="status-badge status-${p.status}">${p.status}</span></td>
+                        <td>${p.in_safe_zone ? '🏠' : ''}</td>
+                        <td>
+                            <button class="btn btn-small btn-primary" onclick="addMod('${id}')">+Mod</button>
+                            ${p.status === 'captured' ? `<button class="btn btn-small btn-success" onclick="releasePlayer('${id}')">Release</button>` : ''}
+                            <button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')">Kick</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            } catch (err) {
+                console.error('Failed to load players:', err);
+            }
+        }
+        
+        async function loadMessages() {
+            try {
+                const resp = await fetch('/api/messages');
+                const msgs = await resp.json();
+                
+                const log = document.getElementById('chat-log');
+                log.innerHTML = '';
+                
+                if (msgs.length === 0) {
+                    log.innerHTML = '<div class="chat-msg">No messages yet</div>';
+                } else {
+                    msgs.forEach(addChatMessage);
+                }
+            } catch (err) {
+                console.error('Failed to load messages:', err);
             }
         }
         
         async function loadBeacons() {
-            const resp = await fetch('/api/safezones');
-            const beacons = await resp.json();
-            
-            const list = document.getElementById('beacons-list');
-            if (beacons.length === 0) {
-                list.innerHTML = '<p style="color: #888;">No beacons configured</p>';
-            } else {
-                list.innerHTML = beacons.map(b => `
-                    <div class="beacon-item">
-                        <div class="beacon-info">
-                            <div class="beacon-name">${b.name}</div>
-                            <div class="beacon-details">ID: ${b.beacon_id} | RSSI: ${b.rssi_threshold} | ${b.active ? 'Active' : 'Inactive'}</div>
+            try {
+                const resp = await fetch('/api/beacons');
+                const beaconList = await resp.json();
+                
+                const list = document.getElementById('beacons-list');
+                if (beaconList.length === 0) {
+                    list.innerHTML = '<p style="color: #888;">No beacons configured</p>';
+                } else {
+                    list.innerHTML = beaconList.map(b => `
+                        <div class="beacon-item">
+                            <div class="beacon-info">
+                                <div class="beacon-name">${escapeHtml(b.name)}</div>
+                                <div class="beacon-details">ID: ${b.id || b.beacon_id} | RSSI: ${b.rssi || b.rssi_threshold} | ${b.active ? 'Active' : 'Inactive'}</div>
+                            </div>
+                            <div>
+                                <button class="btn btn-small ${b.active ? 'btn-pause' : 'btn-success'}" 
+                                        onclick="toggleBeacon('${b.id || b.beacon_id}', ${!b.active})">
+                                    ${b.active ? 'Disable' : 'Enable'}
+                                </button>
+                                <button class="btn btn-small btn-danger" onclick="deleteBeacon('${b.id || b.beacon_id}')">Delete</button>
+                            </div>
                         </div>
-                        <div>
-                            <button class="btn btn-small ${b.active ? 'btn-pause' : 'btn-success'}" 
-                                    onclick="toggleBeacon('${b.beacon_id}', ${!b.active})">
-                                ${b.active ? 'Disable' : 'Enable'}
-                            </button>
-                            <button class="btn btn-small btn-danger" onclick="deleteBeacon('${b.beacon_id}')">Delete</button>
-                        </div>
-                    </div>
-                `).join('');
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load beacons:', err);
             }
         }
         
         async function loadBounties() {
-            const resp = await fetch('/api/bounties');
-            const bounties = await resp.json();
-            
-            const list = document.getElementById('bounties-list');
-            if (bounties.length === 0) {
-                list.innerHTML = '<p style="color: #888;">No active bounties</p>';
-            } else {
-                list.innerHTML = bounties.map(b => `
-                    <div class="beacon-item">
-                        <div>
-                            <strong>${b.name}</strong> - ${b.points} pts<br>
-                            <small style="color: #888;">${b.reason || 'No reason'}</small>
+            try {
+                const resp = await fetch('/api/bounties');
+                const bounties = await resp.json();
+                
+                const list = document.getElementById('bounties-list');
+                if (bounties.length === 0) {
+                    list.innerHTML = '<p style="color: #888;">No active bounties</p>';
+                } else {
+                    list.innerHTML = bounties.map(b => `
+                        <div class="beacon-item">
+                            <div>
+                                <strong>${escapeHtml(b.name)}</strong> - ${b.points} pts<br>
+                                <small style="color: #888;">${escapeHtml(b.reason) || 'No reason'}</small>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load bounties:', err);
             }
         }
         
         async function loadSightings() {
-            const resp = await fetch('/api/sightings');
-            const sightings = await resp.json();
-            
-            const gallery = document.getElementById('sightings-gallery');
-            if (sightings.length === 0) {
-                gallery.innerHTML = '<p style="color: #888; grid-column: 1/-1; text-align: center;">No photos yet</p>';
-            } else {
-                gallery.innerHTML = sightings.slice(0, 30).map(s => `
-                    <img src="${s.photo}" title="${s.spotter_name} → ${s.target_name}" onclick="window.open('${s.photo}')">
-                `).join('');
+            try {
+                const resp = await fetch('/api/sightings');
+                const sightings = await resp.json();
+                
+                const gallery = document.getElementById('sightings-gallery');
+                if (sightings.length === 0) {
+                    gallery.innerHTML = '<p style="color: #888; grid-column: 1/-1; text-align: center;">No photos yet</p>';
+                } else {
+                    gallery.innerHTML = sightings.slice(0, 30).map(s => `
+                        <img src="${s.photo}" title="${escapeHtml(s.spotter)} → ${escapeHtml(s.target)} (${s.time_str})" onclick="window.open('${s.photo}')">
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load sightings:', err);
             }
         }
         
         async function loadEvents() {
-            const resp = await fetch('/api/events?limit=50');
-            const events = await resp.json();
-            events.reverse().forEach(addEvent);
+            try {
+                const resp = await fetch('/api/events?limit=50');
+                const eventList = await resp.json();
+                eventList.reverse().forEach(addEvent);
+            } catch (err) {
+                console.error('Failed to load events:', err);
+            }
+        }
+        
+        async function sendAdminMessage() {
+            const input = document.getElementById('admin-message');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            try {
+                const resp = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({to: 'all', message: message})
+                });
+                
+                if (resp.ok) {
+                    input.value = '';
+                    notify('Message broadcast to all players');
+                } else {
+                    const data = await resp.json();
+                    notify('Error: ' + (data.error || 'Failed to send'));
+                }
+            } catch (err) {
+                notify('Failed to send message');
+            }
         }
         
         async function startGame() {
             const duration = parseInt(document.getElementById('game-duration').value);
             const countdown = parseInt(document.getElementById('game-countdown').value);
             
-            const resp = await fetch('/api/game/start', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({duration, countdown})
-            });
-            
-            if (resp.ok) {
-                notify('Game starting!');
-            } else {
-                const data = await resp.json();
-                notify('Error: ' + data.error);
+            try {
+                const resp = await fetch('/api/game/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({duration, countdown})
+                });
+                
+                if (resp.ok) {
+                    notify('Game starting!');
+                } else {
+                    const data = await resp.json();
+                    notify('Error: ' + data.error);
+                }
+            } catch (err) {
+                notify('Failed to start game');
             }
         }
         
@@ -751,34 +935,23 @@
             }
         }
         
-        async function sendAnnouncement() {
-            const msg = document.getElementById('announcement').value.trim();
-            if (!msg) return;
-            
-            await fetch('/api/messages', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({to: 'all', message: `📢 ADMIN: ${msg}`})
-            });
-            
-            document.getElementById('announcement').value = '';
-            notify('Announcement sent');
-        }
-        
         async function updateSettings() {
             const settings = {
                 honor_system: document.getElementById('setting-honor').checked,
-                allow_role_change_in_safezone: document.getElementById('setting-rolechange').checked,
-                capture_rssi_threshold: parseInt(document.getElementById('setting-capture-rssi').value)
+                allow_role_change: document.getElementById('setting-rolechange').checked,
+                capture_rssi: parseInt(document.getElementById('setting-capture-rssi').value)
             };
             
-            await fetch('/api/game/settings', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(settings)
-            });
-            
-            notify('Settings updated');
+            try {
+                await fetch('/api/game/settings', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(settings)
+                });
+                notify('Settings updated');
+            } catch (err) {
+                notify('Failed to update settings');
+            }
         }
         
         async function addBeacon() {
@@ -791,22 +964,29 @@
                 return;
             }
             
-            const resp = await fetch('/api/safezones', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({beacon_id: beaconId, name, rssi_threshold: rssi})
-            });
-            
-            if (resp.ok) {
-                notify('Beacon added');
-                loadBeacons();
-                document.getElementById('beacon-id').value = '';
-                document.getElementById('beacon-name').value = '';
+            try {
+                const resp = await fetch('/api/beacons', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: beaconId, name: name, rssi: rssi})
+                });
+                
+                if (resp.ok) {
+                    notify('Beacon added');
+                    loadBeacons();
+                    document.getElementById('beacon-id').value = '';
+                    document.getElementById('beacon-name').value = '';
+                } else {
+                    const data = await resp.json();
+                    notify('Error: ' + (data.error || 'Failed to add'));
+                }
+            } catch (err) {
+                notify('Failed to add beacon');
             }
         }
         
         async function toggleBeacon(id, active) {
-            await fetch(`/api/safezones/${id}`, {
+            await fetch(`/api/beacons/${id}`, {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({active})
@@ -816,7 +996,7 @@
         
         async function deleteBeacon(id) {
             if (confirm('Delete this safe zone beacon?')) {
-                await fetch(`/api/safezones/${id}`, {method: 'DELETE'});
+                await fetch(`/api/beacons/${id}`, {method: 'DELETE'});
                 loadBeacons();
             }
         }
@@ -862,20 +1042,24 @@
                 return;
             }
             
-            const resp = await fetch('/api/bounties', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({target_id: target, points, reason})
-            });
-            
-            if (resp.ok) {
-                notify('Bounty set');
-                loadBounties();
-                document.getElementById('bounty-target').value = '';
-                document.getElementById('bounty-reason').value = '';
-            } else {
-                const data = await resp.json();
-                notify('Error: ' + data.error);
+            try {
+                const resp = await fetch('/api/bounties', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({target_id: target, points, reason})
+                });
+                
+                if (resp.ok) {
+                    notify('Bounty set');
+                    loadBounties();
+                    document.getElementById('bounty-target').value = '';
+                    document.getElementById('bounty-reason').value = '';
+                } else {
+                    const data = await resp.json();
+                    notify('Error: ' + data.error);
+                }
+            } catch (err) {
+                notify('Failed to set bounty');
             }
         }
         
@@ -884,6 +1068,11 @@
             window.location.href = '/';
         }
         
+        // Enter key to send message
+        document.getElementById('admin-message').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendAdminMessage();
+        });
+        
         // Initial load
         loadGameState();
         loadPlayers();
@@ -891,10 +1080,13 @@
         loadBounties();
         loadSightings();
         loadEvents();
+        loadMessages();
         
         // Periodic updates
         setInterval(loadGameState, 3000);
         setInterval(loadPlayers, 10000);
+        setInterval(loadBeacons, 30000);
+        setInterval(loadBounties, 30000);
     </script>
 </body>
 </html>
