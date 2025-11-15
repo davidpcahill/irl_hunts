@@ -17,6 +17,7 @@ Access at: http://YOUR_IP:5000
 
 from flask import Flask, render_template, request, jsonify, session, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
+from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from functools import wraps
 import secrets
@@ -45,7 +46,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 # CONFIGURATION
 # =============================================================================
 
-ADMIN_PASSWORD = "hunt2024!"
+ADMIN_PASSWORD = os.environ.get("IRLHUNTS_ADMIN_PASSWORD", "hunt2024!")
 DEFAULT_CAPTURE_RSSI = -70
 DEFAULT_SAFEZONE_RSSI = -75
 SIGHTING_POINTS = 25
@@ -211,8 +212,13 @@ def log_event(event_type, data, broadcast=True):
     print(f"[{now_str()}] {event_type}: {data}")
     return event
 
+MAX_PLAYERS = 100  # Reasonable limit for memory/performance
+
 def get_player(device_id):
     if device_id not in players:
+        if len(players) >= MAX_PLAYERS:
+            # Don't create new player if at limit
+            return None
         players[device_id] = {
             "device_id": device_id,
             "nickname": "",
@@ -652,10 +658,15 @@ def api_login():
     device_id = data.get("device_id", "").strip().upper()
     if not device_id or len(device_id) < 4:
         return jsonify({"error": "Invalid device ID"}), 400
+    if len(device_id) > 10:
+        return jsonify({"error": "Device ID too long"}), 400
     
     session["device_id"] = device_id
     session.permanent = True
     player = get_player(device_id)
+    
+    if player is None:
+        return jsonify({"error": "Server at capacity (max players reached)"}), 503
     player["online"] = True
     player["last_ping"] = time.time()
     if player["status"] == "offline":
@@ -775,7 +786,8 @@ def api_upload_photo():
     if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
         return jsonify({"error": "Invalid file type"}), 400
     
-    filename = f"profile_{device_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    base_filename = f"profile_{device_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    filename = secure_filename(base_filename)
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     
     player["profile_pic"] = f"/uploads/{filename}"
@@ -941,7 +953,8 @@ def api_upload_sighting():
     if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
         return jsonify({"error": "Invalid file type"}), 400
     
-    filename = f"sighting_{device_id}_{target_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    base_filename = f"sighting_{device_id}_{target_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    filename = secure_filename(base_filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
     # Check file doesn't already exist (very unlikely with UUID but safe)
@@ -1212,6 +1225,19 @@ def api_update_settings():
     log_event("settings_update", game["settings"])
     return jsonify(game["settings"])
 
+@app.route("/api/game/ready_all", methods=["POST"])
+@admin_required
+def api_ready_all():
+    """Set all assigned players to ready status"""
+    count = 0
+    for p in players.values():
+        if p["role"] != "unassigned" and p["online"] and p["status"] == "lobby":
+            p["status"] = "ready"
+            count += 1
+    log_event("bulk_ready", {"count": count})
+    notify_all_players(f"Admin readied {count} players", "info")
+    return jsonify({"success": True, "count": count})
+
 @app.route("/api/game/start", methods=["POST"])
 @mod_required
 def api_start_game():
@@ -1277,9 +1303,18 @@ def api_start_game():
 def api_pause_game():
     if game["phase"] == "running":
         game["phase"] = "paused"
+        # Store remaining time so we can restore it on resume
+        if game.get("end_time"):
+            remaining = (datetime.fromisoformat(game["end_time"]) - datetime.now()).total_seconds()
+            game["paused_remaining"] = max(0, remaining)
         log_event("game_pause", {})
         notify_all_players("Game PAUSED", "warning")
         socketio.emit("game_paused", {}, room="all")
+    elif game["phase"] == "countdown":
+        game["phase"] = "lobby"
+        log_event("countdown_cancel", {})
+        notify_all_players("Countdown CANCELLED", "warning")
+        socketio.emit("countdown_cancelled", {}, room="all")
     return jsonify({"success": True})
 
 @app.route("/api/game/resume", methods=["POST"])
@@ -1290,6 +1325,10 @@ def api_resume_game():
     
     if game["phase"] == "paused":
         game["phase"] = "running"
+        # Restore timer from paused state
+        if game.get("paused_remaining"):
+            game["end_time"] = (datetime.now() + timedelta(seconds=game["paused_remaining"])).isoformat()
+            del game["paused_remaining"]
         log_event("game_resume", {})
         notify_all_players("Game RESUMED!", "success")
         socketio.emit("game_resumed", {}, room="all")
@@ -1329,9 +1368,13 @@ def api_reset_game():
         p["sightings"] = 0
         p["points"] = 0
         p["in_safe_zone"] = False
+        p["safe_zone_beacon"] = None
         p["captured_by"] = None
         p["has_photo_of"] = []
         p["infections"] = 0
+        p["nearby_players"] = []
+        p["last_rssi"] = {}
+        # Keep nickname and profile_pic - they worked hard on those!
     
     for team in team_scores:
         team_scores[team] = 0
@@ -1369,6 +1412,65 @@ def api_get_player_photos():
             })
     
     return jsonify(photographed)
+
+# =============================================================================
+# GAME STATS API
+# =============================================================================
+
+@app.route("/api/stats", methods=["GET"])
+def api_get_stats():
+    """Get comprehensive game statistics"""
+    mode_config = get_mode_config()
+    
+    total_captures = sum(p["captures"] for p in players.values())
+    total_escapes = sum(p["escapes"] for p in players.values())
+    total_sightings = sum(p["sightings"] for p in players.values())
+    
+    # Top performers
+    top_pred = max((p for p in players.values() if p["role"] == "pred"), 
+                   key=lambda x: x["captures"], default=None)
+    top_prey = max((p for p in players.values() if p["role"] == "prey"), 
+                   key=lambda x: x["escapes"], default=None)
+    never_caught = [p["name"] for p in players.values() 
+                    if p["role"] == "prey" and p["times_captured"] == 0]
+    
+    stats = {
+        "game_mode": game["mode"],
+        "game_mode_name": mode_config["name"],
+        "phase": game["phase"],
+        "total_players": len([p for p in players.values() if p["role"] != "unassigned"]),
+        "online_players": len([p for p in players.values() if p["online"]]),
+        "total_captures": total_captures,
+        "total_escapes": total_escapes,
+        "total_sightings": total_sightings,
+        "active_bounties": len(bounties),
+        "safe_zones": len([b for b in beacons.values() if b.get("active", True)]),
+        "top_predator": {"name": top_pred["name"], "captures": top_pred["captures"]} if top_pred else None,
+        "top_prey": {"name": top_prey["name"], "escapes": top_prey["escapes"]} if top_prey else None,
+        "never_caught": never_caught,
+        "emergency_active": game["emergency"],
+    }
+    
+    if mode_config["infection"]:
+        stats["prey_remaining"] = len([p for p in players.values() if p["role"] == "prey"])
+        stats["total_infections"] = sum(p.get("infections", 0) for p in players.values())
+    
+    if mode_config["team_mode"]:
+        stats["team_scores"] = dict(team_scores)
+    
+    return jsonify(stats)
+
+@app.route("/api/history", methods=["GET"])
+def api_get_game_history():
+    """Get event history for analysis"""
+    event_type = request.args.get("type", None)
+    limit = min(request.args.get("limit", 100, type=int), 500)
+    
+    if event_type:
+        filtered = [e for e in events if e["type"] == event_type]
+        return jsonify(filtered[-limit:])
+    
+    return jsonify(events[-limit:])
 
 # =============================================================================
 # MESSAGING API
@@ -1505,6 +1607,47 @@ def api_add_mod():
         notify_player(device_id, "You are now a moderator!", "success")
     return jsonify({"success": True})
 
+@app.route("/api/mod/remove", methods=["POST"])
+@admin_required
+def api_remove_mod():
+    data = request.json or {}
+    device_id = data.get("device_id", "").upper()
+    if device_id in moderators:
+        moderators.remove(device_id)
+        if device_id in players:
+            log_event("mod_remove", {"player": players[device_id]["name"]})
+            notify_player(device_id, "Moderator status removed", "info")
+    return jsonify({"success": True})
+
+@app.route("/api/mod/force_role", methods=["POST"])
+@mod_required
+def api_force_role():
+    """Force a player's role (admin override)"""
+    data = request.json or {}
+    device_id = data.get("device_id", "").upper()
+    new_role = data.get("role", "")
+    
+    if device_id not in players:
+        return jsonify({"error": "Player not found"}), 404
+    if new_role not in ["prey", "pred", "unassigned"]:
+        return jsonify({"error": "Invalid role"}), 400
+    
+    player = players[device_id]
+    old_role = player["role"]
+    player["role"] = new_role
+    player["original_role"] = new_role
+    
+    log_event("force_role", {"player": player["name"], "from": old_role, "to": new_role})
+    notify_player(device_id, f"Your role was changed to {new_role} by moderator", "warning")
+    
+    # Assign team if needed
+    if get_mode_config()["team_mode"] and new_role == "pred":
+        assign_team(player)
+    elif new_role != "pred":
+        player["team"] = None
+    
+    return jsonify({"success": True})
+
 @app.route("/api/mod/release", methods=["POST"])
 @mod_required
 def api_release_player():
@@ -1561,6 +1704,45 @@ def ws_heartbeat():
     if "device_id" in session and session["device_id"] in players:
         players[session["device_id"]]["last_ping"] = time.time()
         players[session["device_id"]]["online"] = True
+    emit("heartbeat_ack", {"server_time": now_str()})
+
+@app.route("/api/admin/clear_uploads", methods=["POST"])
+@admin_required
+def api_clear_uploads():
+    """Clear all uploaded photos (use after game)"""
+    import glob
+    upload_dir = app.config['UPLOAD_FOLDER']
+    files = glob.glob(os.path.join(upload_dir, "*"))
+    count = 0
+    for f in files:
+        try:
+            os.remove(f)
+            count += 1
+        except:
+            pass
+    log_event("uploads_cleared", {"count": count})
+    return jsonify({"success": True, "files_removed": count})
+
+@app.route("/api/admin/server_info", methods=["GET"])
+@admin_required
+def api_server_info():
+    """Get server health information"""
+    import glob
+    upload_count = len(glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], "*")))
+    
+    return jsonify({
+        "uptime_seconds": time.time() - server_start_time,
+        "total_events": len(events),
+        "total_messages": len(messages),
+        "total_players": len(players),
+        "active_bounties": len(bounties),
+        "upload_count": upload_count,
+        "moderators": list(moderators),
+        "python_version": sys.version,
+    })
+
+# Track server start time
+server_start_time = time.time()
 
 # =============================================================================
 # MAIN

@@ -107,12 +107,29 @@ bool hasActiveNotification() {
 void checkWiFiConnection() {
   bool wasConnected = wifiConnected;
   wifiConnected = (WiFi.status() == WL_CONNECTED);
-  if (!wifiConnected && wasConnected) showNotification("WiFi lost", "warning");
-  else if (wifiConnected && !wasConnected) showNotification("WiFi OK!", "success");
+  
+  if (!wifiConnected && wasConnected) {
+    showNotification("WiFi lost! Reconnecting...", "danger");
+    Serial.println("WiFi connection lost");
+  } else if (wifiConnected && !wasConnected) {
+    showNotification("WiFi reconnected!", "success");
+    Serial.println("WiFi reconnected: " + WiFi.localIP().toString());
+    consecutivePingFails = 0; // Reset ping failures on reconnect
+  }
+  
   if (!wifiConnected && (millis() - lastWifiCheck > WIFI_RECONNECT_INTERVAL)) {
     lastWifiCheck = millis();
-    WiFi.disconnect(); delay(100);
+    Serial.println("Attempting WiFi reconnect...");
+    WiFi.disconnect();
+    delay(100);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+    
+    // Wait a bit for connection
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+      delay(500);
+      attempts++;
+    }
   }
 }
 
@@ -246,7 +263,9 @@ void displayMain() {
   drawScrollingText(24, line3);
   
   String line4 = "Status: " + myStatus;
-  if (inSafeZone) line4 += " | SAFE";
+  if (inSafeZone) {
+    line4 = "🏠 IN SAFE ZONE";
+  }
   display.drawString(0, 36, line4);
   
   // Show battery if available
@@ -309,6 +328,9 @@ void sendBeacon() {
   txCount++;
 }
 
+// Track predator approach trends
+std::map<String, int> lastPredRssi;
+
 void receivePackets() {
   if (!rxFlag) return;
   rxFlag = false;
@@ -321,13 +343,30 @@ void receivePackets() {
       String id = packet.substring(0, sep);
       String type = packet.substring(sep + 1);
       if (id != NODE_ID) {
-        if (type == "SAFEZONE" || type == "BEACON") beaconRssi[id] = (int)rssi;
-        else if (type == "pred" || type == "prey" || type == "unknown") {
+        if (type == "SAFEZONE" || type == "BEACON") {
+          beaconRssi[id] = (int)rssi;
+        } else if (type == "pred" || type == "prey" || type == "unknown") {
+          int oldRssi = playerRssi.count(id) ? playerRssi[id] : -999;
           playerRssi[id] = (int)rssi;
           rxCount++;
-          if (!emergencyActive && myRole == "prey" && type == "pred") {
-            if (rssi > -55) showNotification("DANGER! Predator very close!", "danger");
-            else if (rssi > -65) showNotification("Predator approaching!", "warning");
+          
+          // Proximity warnings for prey
+          if (!emergencyActive && myRole == "prey" && type == "pred" && !inSafeZone) {
+            bool approaching = (oldRssi != -999 && (int)rssi > oldRssi + 3);
+            
+            if (rssi > -50) {
+              showNotification("CRITICAL! Predator RIGHT HERE!", "danger");
+            } else if (rssi > -55) {
+              showNotification("DANGER! Predator very close!", "danger");
+            } else if (rssi > -65) {
+              if (approaching) {
+                showNotification("WARNING! Predator approaching fast!", "danger");
+              } else {
+                showNotification("Predator nearby", "warning");
+              }
+            } else if (rssi > -75 && approaching) {
+              showNotification("Predator detected, moving closer", "warning");
+            }
           }
         }
       }
@@ -577,7 +616,8 @@ void handleButton() {
 void setup() {
   Serial.begin(115200); delay(500);
   Serial.println("\n========================================");
-  Serial.println("IRL Hunts Tracker v4");
+  Serial.println("IRL Hunts Tracker v4.1");
+  Serial.println("Build: " __DATE__ " " __TIME__);
   Serial.println("========================================");
   
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -676,6 +716,8 @@ void loop() {
   if (now - lastMemCheck > 300000) {
     lastMemCheck = now;
     Serial.println("Free heap: " + String(ESP.getFreeHeap()) + " bytes");
+    Serial.println("Uptime: " + String(millis() / 60000) + " minutes");
+    Serial.println("TX: " + String(txCount) + " | RX: " + String(rxCount));
     checkBattery();  // Also check battery
   }
   

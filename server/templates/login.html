@@ -240,7 +240,8 @@
                     <label>Tracker ID</label>
                     <input type="text" id="device_id" placeholder="e.g., T9EF0" 
                            pattern="[A-Za-z0-9]{4,10}" required
-                           style="text-transform: uppercase;" autocomplete="off">
+                           style="text-transform: uppercase;" autocomplete="off"
+                           value="">
                 </div>
                 <div class="form-group">
                     <label>Your Nickname (optional)</label>
@@ -258,6 +259,10 @@
                     2. Enter it above with an optional nickname<br>
                     3. Choose your role: Prey 🐰 or Predator 🦊
                 </p>
+                <button onclick="localStorage.removeItem('irlhunts_device_id'); document.getElementById('device_id').value=''; this.textContent='Cleared!'; setTimeout(() => this.textContent='Clear Saved ID', 2000);" 
+                        style="margin-top: 10px; background: rgba(255,255,255,0.1); border: none; color: #888; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 11px;">
+                    Clear Saved ID
+                </button>
             </div>
         </div>
         
@@ -295,10 +300,19 @@
             setTimeout(() => err.style.display = 'none', 5000);
         }
         
+        // Load remembered device ID
+        const rememberedId = localStorage.getItem('irlhunts_device_id');
+        if (rememberedId) {
+            document.getElementById('device_id').value = rememberedId;
+        }
+        
         async function loginPlayer(e) {
             e.preventDefault();
             const deviceId = document.getElementById('device_id').value.toUpperCase().trim();
             const nickname = document.getElementById('nickname').value.trim();
+            
+            // Remember device ID for next time
+            localStorage.setItem('irlhunts_device_id', deviceId);
             
             try {
                 const resp = await fetch('/api/login', {

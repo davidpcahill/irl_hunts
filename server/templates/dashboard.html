@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0a0a14">
+    <meta name="description" content="IRL Hunts - Real-world predator vs prey game">
     <title>IRL Hunts - Play</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -13,6 +18,13 @@
             background: #0a0a14;
             color: #e0e0e0;
             min-height: 100vh;
+            scroll-behavior: smooth;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Prevent pull-to-refresh on mobile */
+        html, body {
+            overscroll-behavior-y: contain;
         }
         
         .header {
@@ -200,6 +212,10 @@
         .btn:hover { transform: translateY(-2px); }
         .btn:active { transform: translateY(0); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn:focus { outline: 2px solid #feca57; outline-offset: 2px; }
+        
+        /* Better focus for all interactive elements */
+        button:focus, input:focus, select:focus { outline: 2px solid #feca57; outline-offset: 2px; }
         
         .btn-prey { background: #00cec9; color: #000; }
         .btn-pred { background: #ff7675; color: #fff; }
@@ -555,6 +571,13 @@
     </style>
 </head>
 <body>
+    <div id="loading-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a14; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s;">
+        <div style="text-align: center;">
+            <div style="font-size: 3em; margin-bottom: 20px;">🎯</div>
+            <div style="color: #feca57; font-size: 1.2em;">Loading IRL Hunts...</div>
+        </div>
+    </div>
+    
     <div class="header">
         <h1>🎯 IRL HUNTS</h1>
         <div class="header-info">
@@ -569,6 +592,7 @@
             <div id="mode-badge" class="mode-badge">CLASSIC</div>
             <div id="team-badge" class="team-badge" style="display: none;"></div>
             <div id="phase-badge" class="phase-badge phase-lobby">LOBBY</div>
+            <button class="logout-btn" onclick="toggleSound()" id="sound-btn" title="Toggle notification sounds">🔊</button>
             <button class="logout-btn" onclick="logout()">Exit</button>
         </div>
     </div>
@@ -645,6 +669,17 @@
             <div class="card">
                 <h2>⏱️ Game Time</h2>
                 <div id="timer" class="timer">--:--</div>
+                <div id="live-stats" style="margin-top: 10px; font-size: 12px; color: #888;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Captures:</span><span id="stat-captures">0</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Escapes:</span><span id="stat-escapes">0</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Sightings:</span><span id="stat-sightings">0</span>
+                    </div>
+                </div>
                 <p id="game-info" style="text-align: center; color: #888; margin-top: 10px;">
                     Waiting for game to start...
                 </p>
@@ -787,10 +822,30 @@
             document.getElementById('connection-dot').className = 'connection-dot disconnected';
             document.getElementById('connection-text').textContent = 'Disconnected';
             notify('Lost connection to server!', 'danger');
+            
+            // Show offline banner
+            if (!document.getElementById('offline-banner')) {
+                const banner = document.createElement('div');
+                banner.id = 'offline-banner';
+                banner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #d63031; color: white; padding: 10px; text-align: center; z-index: 9999; font-weight: bold;';
+                banner.textContent = '⚠️ OFFLINE - Attempting to reconnect...';
+                document.body.prepend(banner);
+            }
+        });
+        
+        socket.on('connect', () => {
+            const banner = document.getElementById('offline-banner');
+            if (banner) banner.remove();
         });
         
         socket.on('reconnect', () => {
             notify('Reconnected to server', 'success');
+            // Reload everything after reconnect
+            loadGameState();
+            loadLeaderboard();
+            loadPlayers();
+            loadMessages();
+            loadGallery();
         });
         
         // Game events - matching server emissions
@@ -902,13 +957,62 @@
             notify('✅ Emergency cleared - game can resume', 'success');
         });
         
+        let soundEnabled = localStorage.getItem('irlhunts_sound') !== 'false';
+        
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem('irlhunts_sound', soundEnabled);
+            document.getElementById('sound-btn').textContent = soundEnabled ? '🔊' : '🔇';
+            notify(soundEnabled ? 'Sound enabled' : 'Sound disabled', 'info');
+        }
+        
+        function playNotificationSound(type) {
+            if (!soundEnabled) return;
+            // Use Web Audio API for simple beeps
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                // Different tones for different types
+                if (type === 'danger') {
+                    osc.frequency.value = 440;
+                    gain.gain.value = 0.3;
+                } else if (type === 'success') {
+                    osc.frequency.value = 880;
+                    gain.gain.value = 0.2;
+                } else {
+                    osc.frequency.value = 660;
+                    gain.gain.value = 0.15;
+                }
+                
+                osc.start();
+                setTimeout(() => {
+                    osc.stop();
+                    ctx.close();
+                }, 150);
+            } catch (e) {
+                // Audio not supported, ignore
+            }
+        }
+        
         function notify(message, type = 'success') {
             const notif = document.createElement('div');
             notif.className = `notification ${type}`;
             notif.textContent = message;
             document.body.appendChild(notif);
             setTimeout(() => notif.remove(), 4000);
+            
+            // Play sound for important notifications
+            if (type === 'danger' || type === 'warning' || type === 'success') {
+                playNotificationSound(type);
+            }
         }
+        
+        // Update sound button on load
+        document.getElementById('sound-btn').textContent = soundEnabled ? '🔊' : '🔇';
         
         function updatePhase(phase) {
             const badge = document.getElementById('phase-badge');
@@ -1077,6 +1181,18 @@
             }
         }
         
+        async function loadStats() {
+            try {
+                const resp = await fetch('/api/stats');
+                const stats = await resp.json();
+                document.getElementById('stat-captures').textContent = stats.total_captures || 0;
+                document.getElementById('stat-escapes').textContent = stats.total_escapes || 0;
+                document.getElementById('stat-sightings').textContent = stats.total_sightings || 0;
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+        
         async function loadGameState() {
             try {
                 const resp = await fetch('/api/game');
@@ -1109,7 +1225,12 @@
                     const mins = Math.floor(state.time_remaining / 60);
                     const secs = state.time_remaining % 60;
                     timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                    info.textContent = `${state.online_count} players online • ${state.mode_name || modeConfig.name}`;
+                    let infoText = `${state.online_count} online`;
+                    if (modeConfig.infection && state.prey_count !== undefined) {
+                        infoText += ` • ${state.prey_count} prey left`;
+                    }
+                    infoText += ` • ${state.mode_name || modeConfig.name}`;
+                    info.textContent = infoText;
                 } else if (state.phase === 'lobby') {
                     timer.textContent = '--:--';
                     info.textContent = `${state.ready_count}/${state.player_count} ready`;
@@ -1469,6 +1590,17 @@
             socket.emit('heartbeat');
         }
         
+        // Global error handler
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('Global error:', msg, url, line);
+            notify('An error occurred. Try refreshing.', 'error');
+            return false;
+        };
+        
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+        
         // Initial load
         loadGameState();
         loadLeaderboard();
@@ -1478,15 +1610,48 @@
         updateModeDisplay();
         loadPhotographedPrey();
         
+        // Hide loading overlay
+        setTimeout(() => {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 500);
+            }
+        }, 500);
+        
         // Periodic updates
         setInterval(loadGameState, 3000);
         setInterval(loadLeaderboard, 10000);
         setInterval(loadPlayers, 10000);
         setInterval(sendHeartbeat, 10000);
+        setInterval(loadStats, 5000);
+        
+        // Initial stats load
+        loadStats();
         
         // Enter to send message
         document.getElementById('msg-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMsg();
+        });
+        
+        // Global keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Don't trigger if typing in input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            switch(e.key.toLowerCase()) {
+                case 'p':
+                    openSightingModal();
+                    break;
+                case 'r':
+                    loadLeaderboard();
+                    loadPlayers();
+                    notify('Refreshed data', 'info');
+                    break;
+                case 'escape':
+                    closeSightingModal();
+                    break;
+            }
         });
     </script>
 </body>

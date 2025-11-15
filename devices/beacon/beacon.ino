@@ -174,5 +174,19 @@ void loop() {
     display.display();
   }
   
+  // Health monitoring (every 5 minutes)
+  static unsigned long lastHealth = 0;
+  static int errorCount = 0;
+  if (now - lastHealth > 300000) {
+    lastHealth = now;
+    Serial.println("=== BEACON HEALTH ===");
+    Serial.println("ID: " + BEACON_ID);
+    Serial.println("TX Count: " + String(txCount));
+    Serial.println("Errors: " + String(errorCount));
+    Serial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+    Serial.println("Uptime: " + String(millis() / 60000) + " minutes");
+    Serial.println("====================");
+  }
+  
   delay(10);
 }

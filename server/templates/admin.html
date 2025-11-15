@@ -403,6 +403,10 @@
         <h1>🔧 Admin Control Panel</h1>
         <div style="display: flex; align-items: center; gap: 15px;">
             <span class="admin-badge">ADMIN</span>
+            <label style="color: #888; font-size: 12px; margin-right: 10px;">
+                <input type="checkbox" id="auto-refresh" checked onchange="toggleAutoRefresh()" style="margin-right: 5px;">
+                Auto-refresh
+            </label>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
     </div>
@@ -425,6 +429,7 @@
         </div>
         
         <div class="stats-grid">
+            <div class="stat-box"><div class="stat-value" id="stat-uptime">0m</div><div class="stat-label">Server Uptime</div></div>
             <div class="stat-box"><div class="stat-value" id="stat-players">0</div><div class="stat-label">Total Players</div></div>
             <div class="stat-box"><div class="stat-value" id="stat-preds">0</div><div class="stat-label">Predators</div></div>
             <div class="stat-box"><div class="stat-value" id="stat-prey">0</div><div class="stat-label">Prey</div></div>
@@ -470,6 +475,8 @@
                 <button class="btn btn-pause" onclick="resumeGame()">▶️ Resume</button>
                 <button class="btn btn-end" onclick="endGame()">⏹️ End Game</button>
                 <button class="btn btn-reset" onclick="resetGame()">🔄 Reset All</button>
+                <button class="btn btn-primary" onclick="exportGameData()">📥 Export Data</button>
+                <button class="btn btn-warning" onclick="clearUploads()">🗑️ Clear Photos</button>
             </div>
             
             <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
@@ -482,6 +489,7 @@
                     <input type="number" id="game-countdown" value="10" min="5" max="60" style="width: 100px;">
                 </div>
             </div>
+            <button class="btn btn-primary" onclick="readyAllPlayers()">✅ Ready All Players</button>
             
             <div style="border-top: 2px solid #d63031; padding-top: 15px; margin-top: 15px;">
                 <h3 style="color: #ff7675; margin-bottom: 10px;">🚨 Emergency Controls</h3>
@@ -713,6 +721,19 @@
         
         function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
         
+        async function loadServerInfo() {
+            try {
+                const resp = await fetch('/api/admin/server_info');
+                if (resp.ok) {
+                    const info = await resp.json();
+                    const uptime = Math.floor(info.uptime_seconds / 60);
+                    document.getElementById('stat-uptime').textContent = uptime < 60 ? `${uptime}m` : `${Math.floor(uptime/60)}h`;
+                }
+            } catch (err) {
+                // Server info optional
+            }
+        }
+        
         async function loadGameState() {
             try {
                 const resp = await fetch('/api/game');
@@ -776,7 +797,12 @@
                     
                     const row = document.createElement('tr');
                     const teamBadge = p.team ? `<span class="team-badge">${p.team}</span>` : '';
-                    row.innerHTML = `<td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td><td>${id}</td><td>${escapeHtml(p.name)}</td><td>${p.role}</td><td>${teamBadge}</td><td><span class="status-badge status-${p.status}">${p.status}</span></td><td>${p.in_safe_zone ? '🏠' : ''}</td><td><button class="btn btn-small btn-primary" onclick="addMod('${id}')">+Mod</button>${p.status === 'captured' ? `<button class="btn btn-small btn-success" onclick="releasePlayer('${id}')">Release</button>` : ''}<button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')">Kick</button></td>`;
+                    row.innerHTML = `<td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td><td>${id}</td><td>${escapeHtml(p.name)}</td><td>${p.role}</td><td>${teamBadge}</td><td><span class="status-badge status-${p.status}">${p.status}</span></td><td>${p.in_safe_zone ? '🏠' : ''}</td><td>
+                        <button class="btn btn-small btn-primary" onclick="addMod('${id}')" title="Add moderator">+Mod</button>
+                        ${p.status === 'captured' ? `<button class="btn btn-small btn-success" onclick="releasePlayer('${id}')" title="Release from capture">Free</button>` : ''}
+                        <button class="btn btn-small btn-warning" onclick="forceRole('${id}', '${p.role === 'pred' ? 'prey' : 'pred'}')" title="Swap role">Swap</button>
+                        <button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')" title="Remove player">Kick</button>
+                    </td>`;
                     tbody.appendChild(row);
                 }
             } catch (err) { console.error('Failed to load players:', err); }
@@ -810,10 +836,26 @@
             }
         }
         
+        async function readyAllPlayers() {
+            try {
+                const resp = await fetch('/api/game/ready_all', {method: 'POST'});
+                const data = await resp.json();
+                if (resp.ok) {
+                    notify(`Readied ${data.count} players`);
+                    loadPlayers();
+                    loadGameState();
+                } else {
+                    notify('Error: ' + (data.error || 'Failed'));
+                }
+            } catch (err) {
+                notify('Failed to ready players');
+            }
+        }
+        
         async function startGame() { const duration = parseInt(document.getElementById('game-duration').value); const countdown = parseInt(document.getElementById('game-countdown').value); try { const resp = await fetch('/api/game/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration, countdown}) }); if (resp.ok) notify('Game starting!'); else { const data = await resp.json(); notify('Error: ' + data.error); } } catch (err) { notify('Failed to start game'); } }
         async function pauseGame() { await fetch('/api/game/pause', {method: 'POST'}); notify('Game paused'); }
         async function resumeGame() { if (emergencyActive) { notify('Cannot resume - Emergency still active!'); return; } const resp = await fetch('/api/game/resume', {method: 'POST'}); if (!resp.ok) { const data = await resp.json(); notify('Error: ' + data.error); } else { notify('Game resumed'); } }
-        async function endGame() { if (confirm('End game now?')) { await fetch('/api/game/end', {method: 'POST'}); notify('Game ended'); } }
+        async function endGame() { if (confirm('⏹️ END GAME NOW?\n\nThis will calculate final scores and end the match.\nThis cannot be undone!')) { await fetch('/api/game/end', {method: 'POST'}); notify('Game ended'); } }
         async function resetGame() { if (confirm('Reset ALL game data? This clears scores!')) { await fetch('/api/game/reset', {method: 'POST'}); notify('Game reset'); loadGameState(); loadPlayers(); } }
         
         async function triggerEmergency() {
@@ -846,16 +888,105 @@
         async function addBeacon() { const beaconId = document.getElementById('beacon-id').value.trim().toUpperCase(); const name = document.getElementById('beacon-name').value.trim() || beaconId; const rssi = parseInt(document.getElementById('beacon-rssi').value); if (!beaconId) { notify('Enter beacon ID'); return; } try { const resp = await fetch('/api/beacons', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: beaconId, name: name, rssi: rssi}) }); if (resp.ok) { notify('Beacon added'); loadBeacons(); document.getElementById('beacon-id').value = ''; document.getElementById('beacon-name').value = ''; } else { const data = await resp.json(); notify('Error: ' + (data.error || 'Failed to add')); } } catch (err) { notify('Failed to add beacon'); } }
         async function toggleBeacon(id, active) { await fetch(`/api/beacons/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({active}) }); loadBeacons(); }
         async function deleteBeacon(id) { if (confirm('Delete this safe zone beacon?')) { await fetch(`/api/beacons/${id}`, {method: 'DELETE'}); loadBeacons(); } }
-        async function addMod(id) { await fetch('/api/mod/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({device_id: id}) }); notify(`${id} is now a mod`); }
+        async function addMod(id) { 
+            await fetch('/api/mod/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({device_id: id}) }); 
+            notify(`${id} is now a mod`);
+            loadPlayers();
+        }
+        
+        async function removeMod(id) {
+            await fetch('/api/mod/remove', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({device_id: id}) });
+            notify(`Removed mod status from ${id}`);
+            loadPlayers();
+        }
+        
+        async function forceRole(id, role) {
+            await fetch('/api/mod/force_role', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({device_id: id, role: role}) });
+            notify(`Set ${id} to ${role}`);
+            loadPlayers();
+        }
         async function releasePlayer(id) { await fetch('/api/mod/release', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({device_id: id}) }); notify('Player released'); loadPlayers(); }
         async function kickPlayer(id) { if (confirm(`Kick ${id}?`)) { await fetch('/api/mod/kick', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({device_id: id}) }); notify('Player kicked'); loadPlayers(); } }
         async function setBounty() { const target = document.getElementById('bounty-target').value.trim().toUpperCase(); const points = parseInt(document.getElementById('bounty-points').value); const reason = document.getElementById('bounty-reason').value.trim(); if (!target) { notify('Enter target ID'); return; } try { const resp = await fetch('/api/bounties', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target_id: target, points, reason}) }); if (resp.ok) { notify('Bounty set'); loadBounties(); document.getElementById('bounty-target').value = ''; document.getElementById('bounty-reason').value = ''; } else { const data = await resp.json(); notify('Error: ' + data.error); } } catch (err) { notify('Failed to set bounty'); } }
+        async function clearUploads() {
+            if (!confirm('Delete ALL uploaded photos? This cannot be undone!')) return;
+            try {
+                const resp = await fetch('/api/admin/clear_uploads', {method: 'POST'});
+                const data = await resp.json();
+                if (resp.ok) {
+                    notify(`Cleared ${data.files_removed} files`);
+                    loadSightings();
+                }
+            } catch (err) {
+                notify('Failed to clear uploads');
+            }
+        }
+        
+        async function exportGameData() {
+            try {
+                const [game, players, events, stats] = await Promise.all([
+                    fetch('/api/game').then(r => r.json()),
+                    fetch('/api/players').then(r => r.json()),
+                    fetch('/api/events?limit=500').then(r => r.json()),
+                    fetch('/api/stats').then(r => r.json())
+                ]);
+                
+                const exportData = {
+                    exported_at: new Date().toISOString(),
+                    game_state: game,
+                    players: players,
+                    events: events,
+                    stats: stats
+                };
+                
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `irlhunts_export_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                notify('Game data exported!');
+            } catch (err) {
+                notify('Export failed: ' + err.message);
+            }
+        }
+        
         async function logout() { await fetch('/api/logout', {method: 'POST'}); window.location.href = '/'; }
         
         document.getElementById('admin-message').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendAdminMessage(); });
         
-        loadGameState(); loadPlayers(); loadBeacons(); loadBounties(); loadSightings(); loadEvents(); loadMessages(); updateModeDescription();
-        setInterval(loadGameState, 3000); setInterval(loadPlayers, 10000); setInterval(loadBeacons, 30000); setInterval(loadBounties, 30000);
+        loadGameState(); loadPlayers(); loadBeacons(); loadBounties(); loadSightings(); loadEvents(); loadMessages(); updateModeDescription(); loadServerInfo();
+        let autoRefreshEnabled = true;
+        let refreshIntervals = [];
+        
+        function startAutoRefresh() {
+            refreshIntervals = [
+                setInterval(loadGameState, 3000),
+                setInterval(loadPlayers, 10000),
+                setInterval(loadBeacons, 30000),
+                setInterval(loadBounties, 30000),
+                setInterval(loadServerInfo, 60000)
+            ];
+        }
+        
+        function stopAutoRefresh() {
+            refreshIntervals.forEach(id => clearInterval(id));
+            refreshIntervals = [];
+        }
+        
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = document.getElementById('auto-refresh').checked;
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+                notify('Auto-refresh enabled');
+            } else {
+                stopAutoRefresh();
+                notify('Auto-refresh disabled - manual refresh only');
+            }
+        }
+        
+        startAutoRefresh();
     </script>
 </body>
 </html>
