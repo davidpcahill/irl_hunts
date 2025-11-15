@@ -38,6 +38,7 @@
             display: flex;
             gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .player-badge {
@@ -54,6 +55,30 @@
             height: 28px;
             border-radius: 50%;
             object-fit: cover;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+        }
+        
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .connected { background: #00b894; }
+        .disconnected { background: #d63031; animation: blink 1s infinite; }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
         
         .phase-badge {
@@ -76,11 +101,43 @@
             50% { transform: scale(1.05); }
         }
         
+        .mode-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #feca57;
+            color: #000;
+        }
+        
+        .team-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #48dbfb;
+            color: #000;
+        }
+        
         .main {
             padding: 15px;
             max-width: 1400px;
             margin: 0 auto;
         }
+        
+        .mode-hint {
+            background: linear-gradient(90deg, rgba(254,202,87,0.1), rgba(255,107,107,0.1));
+            border: 1px solid rgba(254,202,87,0.3);
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .mode-hint strong { color: #feca57; }
+        .mode-hint.infection { border-color: rgba(214,48,49,0.5); background: linear-gradient(90deg, rgba(214,48,49,0.1), rgba(225,112,85,0.1)); }
+        .mode-hint.photo { border-color: rgba(9,132,227,0.5); background: linear-gradient(90deg, rgba(9,132,227,0.1), rgba(72,219,251,0.1)); }
         
         .grid {
             display: grid;
@@ -104,9 +161,7 @@
             transition: transform 0.2s;
         }
         
-        .card:hover {
-            transform: translateY(-2px);
-        }
+        .card:hover { transform: translateY(-2px); }
         
         .card h2 {
             font-size: 1.1em;
@@ -144,6 +199,7 @@
         
         .btn:hover { transform: translateY(-2px); }
         .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         
         .btn-prey { background: #00cec9; color: #000; }
         .btn-pred { background: #ff7675; color: #fff; }
@@ -152,11 +208,7 @@
         .btn-danger { background: #d63031; color: #fff; }
         .btn-primary { background: #0984e3; color: #fff; }
         
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
         
         .timer {
             font-size: 2.5em;
@@ -166,10 +218,7 @@
             font-family: monospace;
         }
         
-        .leaderboard {
-            max-height: 350px;
-            overflow-y: auto;
-        }
+        .leaderboard { max-height: 350px; overflow-y: auto; }
         
         .lb-section h3 {
             color: #666;
@@ -188,12 +237,7 @@
             margin-bottom: 8px;
         }
         
-        .lb-rank {
-            font-size: 1.4em;
-            font-weight: 700;
-            width: 35px;
-        }
-        
+        .lb-rank { font-size: 1.4em; font-weight: 700; width: 35px; }
         .rank-1 { color: #ffd700; }
         .rank-2 { color: #c0c0c0; }
         .rank-3 { color: #cd7f32; }
@@ -210,12 +254,7 @@
         .lb-info { flex: 1; }
         .lb-name { font-weight: 600; }
         .lb-stats { font-size: 0.85em; color: #888; }
-        
-        .lb-points {
-            font-size: 1.2em;
-            font-weight: 700;
-            color: #feca57;
-        }
+        .lb-points { font-size: 1.2em; font-weight: 700; color: #feca57; }
         
         .online-dot {
             display: inline-block;
@@ -245,19 +284,11 @@
             border-radius: 8px;
         }
         
-        .msg-header {
-            font-size: 0.8em;
-            color: #666;
-            margin-bottom: 4px;
-        }
-        
+        .msg-header { font-size: 0.8em; color: #666; margin-bottom: 4px; }
         .msg-from { color: #48dbfb; font-weight: 600; }
         .msg-content { color: #ccc; }
         
-        .msg-form {
-            display: flex;
-            gap: 8px;
-        }
+        .msg-form { display: flex; gap: 8px; }
         
         .msg-form input, .msg-form select {
             padding: 10px;
@@ -269,9 +300,7 @@
         
         .msg-form input { flex: 1; }
         
-        .profile-section {
-            text-align: center;
-        }
+        .profile-section { text-align: center; }
         
         .profile-pic {
             width: 100px;
@@ -283,10 +312,6 @@
             background: #333;
         }
         
-        .profile-upload {
-            display: none;
-        }
-        
         .upload-label {
             display: inline-block;
             padding: 8px 16px;
@@ -296,9 +321,7 @@
             font-size: 12px;
         }
         
-        .upload-label:hover {
-            background: rgba(255,255,255,0.2);
-        }
+        .upload-label:hover { background: rgba(255,255,255,0.2); }
         
         .sighting-btn {
             position: fixed;
@@ -351,9 +374,10 @@
             to { transform: translateX(0); opacity: 1; }
         }
         
-        .notification.error { background: #d63031; }
+        .notification.error, .notification.danger { background: #d63031; }
         .notification.warning { background: #e17055; }
         .notification.info { background: #0984e3; }
+        .notification.success { background: #00b894; }
         
         .modal {
             display: none;
@@ -381,10 +405,7 @@
             overflow-y: auto;
         }
         
-        .modal-content h2 {
-            margin-bottom: 20px;
-            color: #fff;
-        }
+        .modal-content h2 { margin-bottom: 20px; color: #fff; }
         
         .close-btn {
             float: right;
@@ -428,15 +449,43 @@
         }
         
         .captured-overlay.active { display: flex; }
+        .captured-overlay h1 { font-size: 3em; margin-bottom: 20px; }
+        .captured-overlay p { font-size: 1.3em; margin-bottom: 30px; }
         
-        .captured-overlay h1 {
-            font-size: 3em;
-            margin-bottom: 20px;
+        .emergency-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(214,48,49,0.98);
+            z-index: 5000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
+            animation: emergencyPulse 2s infinite;
         }
         
-        .captured-overlay p {
-            font-size: 1.3em;
-            margin-bottom: 30px;
+        .emergency-overlay.active { display: flex; }
+        
+        @keyframes emergencyPulse {
+            0%, 100% { background: rgba(214,48,49,0.98); }
+            50% { background: rgba(180,30,30,0.98); }
+        }
+        
+        .emergency-overlay h1 { font-size: 2.5em; margin-bottom: 20px; animation: shake 0.5s infinite; }
+        .emergency-overlay p { font-size: 1.2em; margin-bottom: 15px; }
+        .emergency-overlay .emergency-details { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; margin: 20px 0; text-align: left; }
+        .emergency-overlay .emergency-details p { margin-bottom: 10px; }
+        .emergency-overlay strong { color: #feca57; }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-3px); }
+            75% { transform: translateX(3px); }
         }
         
         .logout-btn {
@@ -449,14 +498,9 @@
             font-size: 12px;
         }
         
-        .logout-btn:hover {
-            background: #ff6b6b;
-            color: white;
-        }
+        .logout-btn:hover { background: #ff6b6b; color: white; }
         
-        input[type="file"] {
-            display: none;
-        }
+        input[type="file"] { display: none; }
         
         .photo-preview {
             width: 100%;
@@ -476,22 +520,62 @@
             width: 100%;
             margin-bottom: 10px;
         }
+        
+        .team-scores {
+            background: rgba(72,219,251,0.1);
+            border: 1px solid rgba(72,219,251,0.3);
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 15px;
+        }
+        
+        .team-scores h3 { color: #48dbfb; margin-bottom: 10px; font-size: 14px; }
+        
+        .team-score-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 5px;
+        }
+        
+        .team-score-name { font-weight: 600; }
+        .team-score-value { color: #feca57; font-weight: 700; }
+        
+        .photo-requirement-warning {
+            background: rgba(255,107,107,0.2);
+            border: 1px solid #ff7675;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #ff7675;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>🎯 IRL HUNTS</h1>
         <div class="header-info">
+            <div class="connection-status">
+                <div id="connection-dot" class="connection-dot connected"></div>
+                <span id="connection-text">Connected</span>
+            </div>
             <div class="player-badge">
                 <img id="header-pic" src="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2240%22>?</text></svg>'">
                 <span id="header-name">{{ player.name }}</span>
             </div>
+            <div id="mode-badge" class="mode-badge">CLASSIC</div>
+            <div id="team-badge" class="team-badge" style="display: none;"></div>
             <div id="phase-badge" class="phase-badge phase-lobby">LOBBY</div>
             <button class="logout-btn" onclick="logout()">Exit</button>
         </div>
     </div>
     
     <div class="main">
+        <div id="mode-hint" class="mode-hint" style="display: none;"></div>
+        
         <div class="grid">
             <!-- Profile & Status -->
             <div class="card status-card">
@@ -528,6 +612,14 @@
                     <span class="stat-label">Safe Zone</span>
                     <span class="stat-value" id="your-safezone">{{ 'YES' if player.in_safe_zone else 'NO' }}</span>
                 </div>
+                <div class="stat-row" id="team-row" style="display: none;">
+                    <span class="stat-label">Team</span>
+                    <span class="stat-value" id="your-team">-</span>
+                </div>
+                
+                <div id="photo-requirement" class="photo-requirement-warning" style="display: none;">
+                    📸 <strong>Photo Safari Mode:</strong> You must photograph prey before you can capture them!
+                </div>
                 
                 <div style="margin-top: 15px;">
                     {% if player.role == 'unassigned' %}
@@ -551,6 +643,11 @@
                 <p id="game-info" style="text-align: center; color: #888; margin-top: 10px;">
                     Waiting for game to start...
                 </p>
+                
+                <div id="team-scores-section" class="team-scores" style="display: none;">
+                    <h3>🏆 Team Scores</h3>
+                    <div id="team-scores-list"></div>
+                </div>
                 
                 {% if is_mod %}
                 <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
@@ -600,7 +697,7 @@
                     <p style="color: #888; text-align: center; grid-column: 1/-1;">No photos yet</p>
                 </div>
                 <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="openSightingModal()">
-                    📷 Upload Sighting (+{{ sighting_points if sighting_points else 25 }} pts)
+                    📷 Upload Sighting (<span id="sighting-points">25</span> pts)
                 </button>
             </div>
             
@@ -614,14 +711,28 @@
     
     <!-- Floating Buttons -->
     <button class="sighting-btn" onclick="openSightingModal()" title="Photo Sighting">📷</button>
-    <button class="emergency-btn" onclick="triggerEmergency()" title="Emergency">🚨</button>
+    <button class="emergency-btn" onclick="triggerEmergency()" title="Emergency - Use only for real emergencies!">🚨</button>
     
     <!-- Captured Overlay -->
     <div id="captured-overlay" class="captured-overlay">
         <h1>🚫 CAPTURED!</h1>
         <p id="captured-msg">You were caught!</p>
-        <p>Get to a SAFE ZONE beacon to escape!</p>
+        <p id="captured-hint">Get to a SAFE ZONE beacon to escape!</p>
         <button class="btn btn-success" onclick="dismissCaptured()">I Understand</button>
+    </div>
+    
+    <!-- Emergency Overlay -->
+    <div id="emergency-overlay" class="emergency-overlay">
+        <h1>🚨 EMERGENCY 🚨</h1>
+        <p>GAME PAUSED - PLAYER NEEDS HELP!</p>
+        <div class="emergency-details">
+            <p><strong>Player:</strong> <span id="emergency-player-name">Unknown</span></p>
+            <p><strong>Reason:</strong> <span id="emergency-reason">Emergency triggered</span></p>
+            <p><strong>Location Hint:</strong> <span id="emergency-location">Unknown</span></p>
+            <p><strong>Time:</strong> <span id="emergency-time">--:--:--</span></p>
+        </div>
+        <p style="font-size: 1.4em; color: #feca57;">HELP FIND THIS PLAYER!</p>
+        <p style="font-size: 0.9em; color: #ccc;">Game will resume when moderator clears emergency</p>
     </div>
     
     <!-- Sighting Upload Modal -->
@@ -654,47 +765,85 @@
         const socket = io();
         const playerId = "{{ player.device_id }}";
         let playerData = {{ player|tojson }};
+        let currentGameMode = "{{ game_mode }}";
+        let modeConfig = {{ mode_config|tojson }};
+        let emergencyActive = false;
+        let capturedDismissed = false;
         
-        socket.on('connect', () => console.log('Connected'));
+        // Connection status
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            document.getElementById('connection-dot').className = 'connection-dot connected';
+            document.getElementById('connection-text').textContent = 'Connected';
+        });
         
-        socket.on('game_event', (event) => {
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            document.getElementById('connection-dot').className = 'connection-dot disconnected';
+            document.getElementById('connection-text').textContent = 'Disconnected';
+            notify('Lost connection to server!', 'danger');
+        });
+        
+        socket.on('reconnect', () => {
+            notify('Reconnected to server', 'success');
+        });
+        
+        // Game events - matching server emissions
+        socket.on('event', (event) => {
             console.log('Event:', event);
             loadLeaderboard();
             loadPlayers();
         });
         
-        socket.on('capture_event', (data) => {
+        socket.on('capture', (data) => {
             notify(`🎯 ${data.pred} captured ${data.prey}!`, 'warning');
+            loadLeaderboard();
         });
         
-        socket.on('escape_event', (data) => {
+        socket.on('infection', (data) => {
+            notify(`🦠 ${data.prey} has been INFECTED! Now a predator!`, 'danger');
+            loadLeaderboard();
+            loadPlayers();
+        });
+        
+        socket.on('escape', (data) => {
             notify(`🏃 ${data.prey} escaped!`, 'info');
+            loadLeaderboard();
         });
         
-        socket.on('sighting_event', (data) => {
+        socket.on('sighting', (data) => {
             notify(`📸 ${data.spotter} spotted ${data.target}!`, 'info');
             loadGallery();
         });
         
         socket.on('notification', (data) => {
-            notify(data.message, data.type);
+            notify(data.message, data.type || 'info');
         });
         
-        socket.on('player_updated', (player) => {
+        socket.on('player_update', (player) => {
             if (player.device_id === playerId) {
                 updateMyStatus(player);
             }
             loadPlayers();
+            loadLeaderboard();
         });
         
         socket.on('game_starting', (data) => {
             notify(`Game starting in ${data.countdown} seconds!`, 'warning');
             updatePhase('countdown');
+            if (data.mode) {
+                currentGameMode = data.mode;
+                updateModeDisplay();
+            }
         });
         
-        socket.on('game_started', () => {
+        socket.on('game_started', (data) => {
             notify('🎮 GAME STARTED!', 'success');
             updatePhase('running');
+            if (data && data.mode) {
+                currentGameMode = data.mode;
+                updateModeDisplay();
+            }
         });
         
         socket.on('game_paused', () => {
@@ -710,10 +859,37 @@
         socket.on('game_ended', (data) => {
             notify('🏁 Game ended!', 'info');
             updatePhase('ended');
+            loadLeaderboard();
+        });
+        
+        socket.on('game_reset', () => {
+            notify('🔄 Game reset to lobby', 'info');
+            updatePhase('lobby');
+            loadGameState();
+        });
+        
+        socket.on('mode_change', (data) => {
+            currentGameMode = data.mode;
+            modeConfig = data.config;
+            updateModeDisplay();
+            notify(`Game mode changed to: ${data.config.name}`, 'info');
         });
         
         socket.on('message', (msg) => {
             addMessage(msg);
+        });
+        
+        // Emergency events
+        socket.on('emergency_alert', (data) => {
+            emergencyActive = true;
+            showEmergencyOverlay(data);
+            notify('🚨 EMERGENCY TRIGGERED! Game Paused!', 'danger');
+        });
+        
+        socket.on('emergency_cleared', () => {
+            emergencyActive = false;
+            hideEmergencyOverlay();
+            notify('✅ Emergency cleared - game can resume', 'success');
         });
         
         function notify(message, type = 'success') {
@@ -730,6 +906,51 @@
             badge.textContent = phase.toUpperCase();
         }
         
+        function updateModeDisplay() {
+            const modeBadge = document.getElementById('mode-badge');
+            const modeHint = document.getElementById('mode-hint');
+            const sightingPts = document.getElementById('sighting-points');
+            const photoReq = document.getElementById('photo-requirement');
+            const capturedHint = document.getElementById('captured-hint');
+            
+            modeBadge.textContent = modeConfig.name.toUpperCase().replace(' MODE', '');
+            sightingPts.textContent = modeConfig.sighting_points || 25;
+            
+            // Mode-specific hints
+            if (modeConfig.infection) {
+                modeHint.innerHTML = '<strong>⚠️ INFECTION MODE:</strong> If captured, you become a predator! No escaping - last survivor wins 1000 points!';
+                modeHint.className = 'mode-hint infection';
+                modeHint.style.display = 'block';
+                capturedHint.textContent = 'You have been INFECTED! You are now a PREDATOR!';
+            } else if (modeConfig.photo_required) {
+                modeHint.innerHTML = '<strong>📸 PHOTO SAFARI:</strong> Predators must photograph prey BEFORE capturing! Double photo points!';
+                modeHint.className = 'mode-hint photo';
+                modeHint.style.display = 'block';
+                if (playerData.role === 'pred') {
+                    photoReq.style.display = 'block';
+                }
+            } else if (modeConfig.team_mode) {
+                modeHint.innerHTML = '<strong>🏆 TEAM COMPETITION:</strong> Work with your team to get the most captures!';
+                modeHint.className = 'mode-hint';
+                modeHint.style.display = 'block';
+            } else {
+                modeHint.style.display = 'none';
+                photoReq.style.display = 'none';
+            }
+        }
+        
+        function showEmergencyOverlay(data) {
+            document.getElementById('emergency-player-name').textContent = data.player_name || 'Unknown';
+            document.getElementById('emergency-reason').textContent = data.reason || 'Emergency triggered';
+            document.getElementById('emergency-location').textContent = data.location_hint || 'Unknown';
+            document.getElementById('emergency-time').textContent = data.time || new Date().toLocaleTimeString();
+            document.getElementById('emergency-overlay').classList.add('active');
+        }
+        
+        function hideEmergencyOverlay() {
+            document.getElementById('emergency-overlay').classList.remove('active');
+        }
+        
         function updateMyStatus(player) {
             playerData = player;
             document.getElementById('your-name').textContent = player.name;
@@ -744,41 +965,68 @@
                 document.getElementById('header-pic').src = player.profile_pic;
             }
             
-            if (player.status === 'captured' && !document.getElementById('captured-overlay').classList.contains('dismissed')) {
+            // Team display
+            if (player.team) {
+                document.getElementById('team-badge').textContent = player.team;
+                document.getElementById('team-badge').style.display = 'inline-block';
+                document.getElementById('team-row').style.display = 'flex';
+                document.getElementById('your-team').textContent = player.team;
+            } else {
+                document.getElementById('team-badge').style.display = 'none';
+                document.getElementById('team-row').style.display = 'none';
+            }
+            
+            // Captured overlay
+            if (player.status === 'captured' && !capturedDismissed && !modeConfig.infection) {
                 document.getElementById('captured-overlay').classList.add('active');
+            }
+            
+            // Photo requirement display
+            if (modeConfig.photo_required && player.role === 'pred') {
+                document.getElementById('photo-requirement').style.display = 'block';
+            } else {
+                document.getElementById('photo-requirement').style.display = 'none';
             }
         }
         
         function dismissCaptured() {
             document.getElementById('captured-overlay').classList.remove('active');
-            document.getElementById('captured-overlay').classList.add('dismissed');
+            capturedDismissed = true;
         }
         
         async function setRole(role) {
-            const resp = await fetch('/api/player', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({role})
-            });
-            if (resp.ok) {
-                notify(`You are now a ${role}!`, 'success');
-                location.reload();
-            } else {
-                const data = await resp.json();
-                notify(data.error, 'error');
+            try {
+                const resp = await fetch('/api/player', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({role})
+                });
+                if (resp.ok) {
+                    notify(`You are now a ${role}!`, 'success');
+                    location.reload();
+                } else {
+                    const data = await resp.json();
+                    notify(data.error || 'Failed to set role', 'error');
+                }
+            } catch (err) {
+                notify('Connection error', 'error');
             }
         }
         
         async function setReady() {
-            const resp = await fetch('/api/player', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({status: 'ready'})
-            });
-            if (resp.ok) {
-                notify('You are ready!', 'success');
-                document.getElementById('ready-btn').textContent = '✅ Ready!';
-                document.getElementById('ready-btn').disabled = true;
+            try {
+                const resp = await fetch('/api/player', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: 'ready'})
+                });
+                if (resp.ok) {
+                    notify('You are ready!', 'success');
+                    document.getElementById('ready-btn').textContent = '✅ Ready!';
+                    document.getElementById('ready-btn').disabled = true;
+                }
+            } catch (err) {
+                notify('Failed to set ready status', 'error');
             }
         }
         
@@ -788,129 +1036,213 @@
             const formData = new FormData();
             formData.append('file', input.files[0]);
             
-            const resp = await fetch('/api/player/photo', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (resp.ok) {
-                const data = await resp.json();
-                document.getElementById('profile-pic').src = data.url;
-                document.getElementById('header-pic').src = data.url;
-                notify('Profile picture updated!', 'success');
-            } else {
-                notify('Failed to upload', 'error');
+            try {
+                const resp = await fetch('/api/player/photo', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (resp.ok) {
+                    const data = await resp.json();
+                    document.getElementById('profile-pic').src = data.url;
+                    document.getElementById('header-pic').src = data.url;
+                    notify('Profile picture updated!', 'success');
+                } else {
+                    notify('Failed to upload', 'error');
+                }
+            } catch (err) {
+                notify('Upload error', 'error');
             }
         }
         
         async function loadGameState() {
-            const resp = await fetch('/api/game');
-            const state = await resp.json();
-            
-            updatePhase(state.phase);
-            
-            const timer = document.getElementById('timer');
-            const info = document.getElementById('game-info');
-            
-            if (state.phase === 'running' && state.time_remaining > 0) {
-                const mins = Math.floor(state.time_remaining / 60);
-                const secs = state.time_remaining % 60;
-                timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                info.textContent = `${state.online_count} players online`;
-            } else if (state.phase === 'lobby') {
-                timer.textContent = '--:--';
-                info.textContent = `${state.ready_count}/${state.player_count} ready`;
-            } else if (state.phase === 'ended') {
-                timer.textContent = '00:00';
-                info.textContent = 'Game ended!';
-            } else {
-                timer.textContent = '--:--';
-                info.textContent = state.phase;
+            try {
+                const resp = await fetch('/api/game');
+                const state = await resp.json();
+                
+                updatePhase(state.phase);
+                
+                if (state.mode && state.mode !== currentGameMode) {
+                    currentGameMode = state.mode;
+                    if (state.mode_config) {
+                        modeConfig = state.mode_config;
+                    }
+                    updateModeDisplay();
+                }
+                
+                // Emergency status
+                if (state.emergency && !emergencyActive) {
+                    emergencyActive = true;
+                    // Fetch full emergency details
+                    loadEmergencyStatus();
+                } else if (!state.emergency && emergencyActive) {
+                    emergencyActive = false;
+                    hideEmergencyOverlay();
+                }
+                
+                const timer = document.getElementById('timer');
+                const info = document.getElementById('game-info');
+                
+                if (state.phase === 'running' && state.time_remaining > 0) {
+                    const mins = Math.floor(state.time_remaining / 60);
+                    const secs = state.time_remaining % 60;
+                    timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                    info.textContent = `${state.online_count} players online • ${state.mode_name || modeConfig.name}`;
+                } else if (state.phase === 'lobby') {
+                    timer.textContent = '--:--';
+                    info.textContent = `${state.ready_count}/${state.player_count} ready`;
+                } else if (state.phase === 'ended') {
+                    timer.textContent = '00:00';
+                    info.textContent = 'Game ended!';
+                } else if (state.phase === 'paused') {
+                    info.textContent = state.emergency ? '🚨 EMERGENCY - GAME PAUSED' : 'Game paused';
+                } else {
+                    timer.textContent = '--:--';
+                    info.textContent = state.phase;
+                }
+                
+                // Team scores
+                if (state.team_scores && Object.keys(state.team_scores).length > 0 && modeConfig.team_mode) {
+                    const teamSection = document.getElementById('team-scores-section');
+                    const teamList = document.getElementById('team-scores-list');
+                    teamSection.style.display = 'block';
+                    
+                    let teamsHtml = '';
+                    const sortedTeams = Object.entries(state.team_scores).sort((a, b) => b[1] - a[1]);
+                    for (const [team, score] of sortedTeams) {
+                        teamsHtml += `<div class="team-score-item"><span class="team-score-name">${team}</span><span class="team-score-value">${score} captures</span></div>`;
+                    }
+                    teamList.innerHTML = teamsHtml;
+                } else {
+                    document.getElementById('team-scores-section').style.display = 'none';
+                }
+                
+            } catch (err) {
+                console.error('Failed to load game state:', err);
+            }
+        }
+        
+        async function loadEmergencyStatus() {
+            try {
+                const resp = await fetch('/api/emergency/status');
+                const data = await resp.json();
+                if (data.emergency) {
+                    showEmergencyOverlay({
+                        player_name: data.by,
+                        reason: data.reason,
+                        location_hint: data.location_hint,
+                        time: data.time
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load emergency status:', err);
             }
         }
         
         async function loadLeaderboard() {
-            const resp = await fetch('/api/leaderboard');
-            const lb = await resp.json();
-            
-            const predDiv = document.getElementById('pred-lb');
-            const preyDiv = document.getElementById('prey-lb');
-            
-            predDiv.innerHTML = lb.preds.map((p, i) => `
-                <div class="lb-item">
-                    <div class="lb-rank rank-${i+1}">#${i+1}</div>
-                    <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
-                    <div class="lb-info">
-                        <div class="lb-name">
-                            <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
-                            ${p.name}
-                        </div>
-                        <div class="lb-stats">${p.captures} captures</div>
-                    </div>
-                    <div class="lb-points">${p.points}</div>
-                </div>
-            `).join('') || '<p style="color:#666">No predators</p>';
-            
-            preyDiv.innerHTML = lb.prey.map((p, i) => `
-                <div class="lb-item">
-                    <div class="lb-rank rank-${i+1}">#${i+1}</div>
-                    <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
-                    <div class="lb-info">
-                        <div class="lb-name">
-                            <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
-                            ${p.name}
-                        </div>
-                        <div class="lb-stats">${p.escapes} escapes, ${p.times_captured} caught</div>
-                    </div>
-                    <div class="lb-points">${p.points}</div>
-                </div>
-            `).join('') || '<p style="color:#666">No prey</p>';
-        }
-        
-        async function loadPlayers() {
-            const resp = await fetch('/api/players');
-            const players = await resp.json();
-            
-            const list = document.getElementById('players-list');
-            const targetSelect = document.getElementById('sighting-target');
-            
-            let html = '';
-            let targetOptions = '<option value="">Select target...</option>';
-            
-            for (const [id, p] of Object.entries(players)) {
-                if (p.role === 'unassigned') continue;
+            try {
+                const resp = await fetch('/api/leaderboard');
+                const lb = await resp.json();
                 
-                html += `
+                const predDiv = document.getElementById('pred-lb');
+                const preyDiv = document.getElementById('prey-lb');
+                
+                predDiv.innerHTML = lb.preds.map((p, i) => `
                     <div class="lb-item">
+                        <div class="lb-rank rank-${i+1}">#${i+1}</div>
                         <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
                         <div class="lb-info">
                             <div class="lb-name">
                                 <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
-                                ${p.name}
+                                ${escapeHtml(p.name)}
+                                ${p.team ? `<span style="font-size:10px;color:#48dbfb;">[${p.team}]</span>` : ''}
                             </div>
-                            <div class="lb-stats">${p.role} | ${p.status}</div>
+                            <div class="lb-stats">${p.captures} captures${p.infections > 0 ? `, ${p.infections} infections` : ''}</div>
                         </div>
+                        <div class="lb-points">${p.points}</div>
                     </div>
-                `;
+                `).join('') || '<p style="color:#666">No predators</p>';
                 
-                // Add to sighting targets (opposite role)
-                if (playerData.role === 'pred' && p.role === 'prey') {
-                    targetOptions += `<option value="${id}">${p.name} (${id})</option>`;
-                } else if (playerData.role === 'prey' && p.role === 'pred') {
-                    targetOptions += `<option value="${id}">${p.name} (${id})</option>`;
-                }
+                preyDiv.innerHTML = lb.prey.map((p, i) => `
+                    <div class="lb-item">
+                        <div class="lb-rank rank-${i+1}">#${i+1}</div>
+                        <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
+                        <div class="lb-info">
+                            <div class="lb-name">
+                                <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
+                                ${escapeHtml(p.name)}
+                            </div>
+                            <div class="lb-stats">${p.escapes} escapes, ${p.times_captured} caught</div>
+                        </div>
+                        <div class="lb-points">${p.points}</div>
+                    </div>
+                `).join('') || '<p style="color:#666">No prey</p>';
+                
+            } catch (err) {
+                console.error('Failed to load leaderboard:', err);
             }
-            
-            list.innerHTML = html || '<p style="color:#666">No players</p>';
-            targetSelect.innerHTML = targetOptions;
+        }
+        
+        async function loadPlayers() {
+            try {
+                const resp = await fetch('/api/players');
+                const players = await resp.json();
+                
+                const list = document.getElementById('players-list');
+                const targetSelect = document.getElementById('sighting-target');
+                
+                let html = '';
+                let targetOptions = '<option value="">Select target...</option>';
+                
+                for (const [id, p] of Object.entries(players)) {
+                    if (p.role === 'unassigned') continue;
+                    
+                    html += `
+                        <div class="lb-item">
+                            <img class="lb-pic" src="${p.profile_pic || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
+                            <div class="lb-info">
+                                <div class="lb-name">
+                                    <span class="online-dot ${p.online ? (p.in_safe_zone ? 'in-safe' : 'online') : 'offline'}"></span>
+                                    ${escapeHtml(p.name)}
+                                    ${p.team ? `<span style="font-size:10px;color:#48dbfb;">[${p.team}]</span>` : ''}
+                                </div>
+                                <div class="lb-stats">${p.role} | ${p.status}${p.in_safe_zone ? ' | 🏠 Safe' : ''}</div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add to sighting targets (opposite role)
+                    if (playerData.role === 'pred' && p.role === 'prey') {
+                        targetOptions += `<option value="${id}">${escapeHtml(p.name)} (${id})</option>`;
+                    } else if (playerData.role === 'prey' && p.role === 'pred') {
+                        targetOptions += `<option value="${id}">${escapeHtml(p.name)} (${id})</option>`;
+                    }
+                }
+                
+                list.innerHTML = html || '<p style="color:#666">No players</p>';
+                targetSelect.innerHTML = targetOptions;
+                
+            } catch (err) {
+                console.error('Failed to load players:', err);
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
         async function loadMessages() {
-            const resp = await fetch('/api/messages');
-            const msgs = await resp.json();
-            const container = document.getElementById('messages');
-            container.innerHTML = '';
-            msgs.forEach(addMessage);
+            try {
+                const resp = await fetch('/api/messages');
+                const msgs = await resp.json();
+                const container = document.getElementById('messages');
+                container.innerHTML = '';
+                msgs.forEach(addMessage);
+            } catch (err) {
+                console.error('Failed to load messages:', err);
+            }
         }
         
         function addMessage(msg) {
@@ -919,9 +1251,9 @@
             div.className = 'msg';
             div.innerHTML = `
                 <div class="msg-header">
-                    <span class="msg-from">${msg.from_name}</span> to ${msg.to} • ${msg.time_str}
+                    <span class="msg-from">${escapeHtml(msg.from_name)}</span> to ${msg.to} • ${msg.time_str}
                 </div>
-                <div class="msg-content">${msg.message}</div>
+                <div class="msg-content">${escapeHtml(msg.message)}</div>
             `;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
@@ -934,26 +1266,33 @@
             
             if (!message) return;
             
-            await fetch('/api/messages', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({to, message})
-            });
-            
-            input.value = '';
+            try {
+                await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({to, message})
+                });
+                input.value = '';
+            } catch (err) {
+                notify('Failed to send message', 'error');
+            }
         }
         
         async function loadGallery() {
-            const resp = await fetch('/api/sightings');
-            const sightings = await resp.json();
-            
-            const gallery = document.getElementById('gallery');
-            if (sightings.length === 0) {
-                gallery.innerHTML = '<p style="color: #888; text-align: center; grid-column: 1/-1;">No photos yet</p>';
-            } else {
-                gallery.innerHTML = sightings.slice(0, 20).map(s => `
-                    <img src="${s.photo}" title="${s.spotter} spotted ${s.target}" onclick="window.open('${s.photo}')">
-                `).join('');
+            try {
+                const resp = await fetch('/api/sightings');
+                const sightings = await resp.json();
+                
+                const gallery = document.getElementById('gallery');
+                if (sightings.length === 0) {
+                    gallery.innerHTML = '<p style="color: #888; text-align: center; grid-column: 1/-1;">No photos yet</p>';
+                } else {
+                    gallery.innerHTML = sightings.slice(0, 20).map(s => `
+                        <img src="${s.photo}" title="${escapeHtml(s.spotter)} spotted ${escapeHtml(s.target)}" onclick="window.open('${s.photo}')">
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load gallery:', err);
             }
         }
         
@@ -996,37 +1335,70 @@
             formData.append('target_id', targetId);
             formData.append('photo', photoInput.files[0]);
             
-            const resp = await fetch('/api/sighting', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (resp.ok) {
-                const data = await resp.json();
-                notify(`Sighting recorded! +${data.points} points`, 'success');
-                closeSightingModal();
-                loadGallery();
-            } else {
-                const data = await resp.json();
-                notify(data.error || 'Upload failed', 'error');
+            try {
+                const resp = await fetch('/api/sighting', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (resp.ok) {
+                    const data = await resp.json();
+                    notify(`Sighting recorded! +${data.points} points`, 'success');
+                    closeSightingModal();
+                    loadGallery();
+                    photoInput.value = '';
+                } else {
+                    const data = await resp.json();
+                    notify(data.error || 'Upload failed', 'error');
+                }
+            } catch (err) {
+                notify('Failed to upload sighting', 'error');
             }
         }
         
         async function triggerEmergency() {
-            if (confirm('Trigger EMERGENCY alert? This will notify all moderators.')) {
-                // TODO: implement emergency endpoint
-                notify('Emergency alert sent!', 'error');
+            if (!confirm('⚠️ TRIGGER EMERGENCY ALERT?\n\nThis will:\n- PAUSE the game for everyone\n- Alert ALL players to find you\n- Only use for REAL emergencies!\n\nContinue?')) {
+                return;
+            }
+            
+            const reason = prompt('Emergency reason (optional):');
+            
+            try {
+                const resp = await fetch('/api/emergency', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        reason: reason || 'Player triggered emergency from dashboard'
+                    })
+                });
+                
+                if (resp.ok) {
+                    notify('🚨 EMERGENCY ALERT SENT! Help is coming!', 'danger');
+                } else {
+                    const data = await resp.json();
+                    notify(data.error || 'Failed to trigger emergency', 'error');
+                }
+            } catch (err) {
+                notify('Failed to send emergency alert', 'error');
             }
         }
         
         async function startGame() {
-            const duration = prompt('Game duration (minutes):', '30');
+            const duration = prompt('Game duration (minutes):', modeConfig.duration || '30');
             if (duration) {
-                await fetch('/api/game/start', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({duration: parseInt(duration), countdown: 10})
-                });
+                try {
+                    const resp = await fetch('/api/game/start', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({duration: parseInt(duration), countdown: 10})
+                    });
+                    if (!resp.ok) {
+                        const data = await resp.json();
+                        notify(data.error || 'Failed to start', 'error');
+                    }
+                } catch (err) {
+                    notify('Failed to start game', 'error');
+                }
             }
         }
         
@@ -1045,17 +1417,24 @@
             window.location.href = '/';
         }
         
+        // Heartbeat
+        function sendHeartbeat() {
+            socket.emit('heartbeat');
+        }
+        
         // Initial load
         loadGameState();
         loadLeaderboard();
         loadPlayers();
         loadMessages();
         loadGallery();
+        updateModeDisplay();
         
         // Periodic updates
         setInterval(loadGameState, 3000);
         setInterval(loadLeaderboard, 10000);
         setInterval(loadPlayers, 10000);
+        setInterval(sendHeartbeat, 10000);
         
         // Enter to send message
         document.getElementById('msg-input').addEventListener('keypress', (e) => {
