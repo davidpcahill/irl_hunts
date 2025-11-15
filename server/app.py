@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-IRL Hunts - Game Server
+IRL Hunts - Game Server v2 (Fixed)
 Real-world predator vs prey game management system
+
+Fixes:
+- Admin announcements now broadcast to all player dongles
+- Message system properly integrated
+- Better notification routing
 
 Run with: python app.py
 Access at: http://YOUR_IP:5000
@@ -131,13 +136,33 @@ def get_player(device_id):
     return players[device_id]
 
 def notify_player(device_id, message, msg_type="info"):
-    """Send notification to player"""
+    """Send notification to a single player"""
     if device_id in players:
         notif = {"message": message, "type": msg_type, "time": now_str()}
         players[device_id]["notifications"].append(notif)
         if len(players[device_id]["notifications"]) > 20:
             players[device_id]["notifications"].pop(0)
         socketio.emit("notification", notif, room=device_id)
+
+def notify_all_players(message, msg_type="info"):
+    """Send notification to ALL players (for admin broadcasts)"""
+    notif = {"message": message, "type": msg_type, "time": now_str()}
+    for device_id in players:
+        players[device_id]["notifications"].append(notif)
+        if len(players[device_id]["notifications"]) > 20:
+            players[device_id]["notifications"].pop(0)
+    socketio.emit("notification", notif, room="all")
+    print(f"[BROADCAST] {msg_type}: {message}")
+
+def notify_team(role, message, msg_type="info"):
+    """Send notification to all players of a specific role"""
+    notif = {"message": message, "type": msg_type, "time": now_str()}
+    for device_id, player in players.items():
+        if player["role"] == role:
+            player["notifications"].append(notif)
+            if len(player["notifications"]) > 20:
+                player["notifications"].pop(0)
+            socketio.emit("notification", notif, room=device_id)
 
 def calculate_points(player):
     """Calculate player's total points"""
@@ -594,7 +619,7 @@ def api_tracker_ping():
     if "beacon_rssi" in data:
         update_safe_zone(device_id, data["beacon_rssi"])
     
-    # Response
+    # Response - include pending notifications
     notifs = player.get("notifications", [])[-5:]
     player["notifications"] = []
     
@@ -731,6 +756,9 @@ def api_start_game():
             p["status"] = "active"
     
     log_event("game_start", {"duration": game["duration"], "countdown": game["countdown"]})
+    
+    # Notify ALL players including dongles
+    notify_all_players(f"Game starting in {game['countdown']} seconds!", "warning")
     socketio.emit("game_starting", {"countdown": game["countdown"]}, room="all")
     
     # Countdown thread
@@ -740,6 +768,7 @@ def api_start_game():
         game["start_time"] = now()
         game["end_time"] = (datetime.now() + timedelta(minutes=game["duration"])).isoformat()
         log_event("game_running", {"duration": game["duration"]})
+        notify_all_players("GAME STARTED! Good luck!", "success")
         socketio.emit("game_started", {}, room="all")
     
     threading.Thread(target=start_after_countdown, daemon=True).start()
@@ -752,6 +781,7 @@ def api_pause_game():
     if game["phase"] == "running":
         game["phase"] = "paused"
         log_event("game_pause", {})
+        notify_all_players("Game PAUSED", "warning")
         socketio.emit("game_paused", {}, room="all")
     return jsonify({"success": True})
 
@@ -762,6 +792,7 @@ def api_resume_game():
     if game["phase"] == "paused":
         game["phase"] = "running"
         log_event("game_resume", {})
+        notify_all_players("Game RESUMED!", "success")
         socketio.emit("game_resumed", {}, room="all")
     return jsonify({"success": True})
 
@@ -773,6 +804,7 @@ def api_end_game():
     game["end_time"] = now()
     lb = get_leaderboard()
     log_event("game_end", {"leaderboard": lb})
+    notify_all_players("GAME OVER!", "info")
     socketio.emit("game_ended", lb, room="all")
     return jsonify({"success": True, "leaderboard": lb})
 
@@ -794,11 +826,12 @@ def api_reset_game():
         p["in_safe_zone"] = False
     
     log_event("game_reset", {})
+    notify_all_players("Game reset to lobby", "info")
     socketio.emit("game_reset", {}, room="all")
     return jsonify({"success": True})
 
 # =============================================================================
-# OTHER APIS
+# MESSAGING API - FIXED
 # =============================================================================
 
 @app.route("/api/events", methods=["GET"])
@@ -858,14 +891,21 @@ def api_send_message():
         "to": to,
         "team": team,
         "message": content,
-        "time": now_str()
+        "time_str": now_str()
     }
     
     messages.append(msg)
     if len(messages) > 500:
         messages.pop(0)
     
+    # Broadcast to web clients
     socketio.emit("message", msg, room="all")
+    
+    # If this is an admin announcement to all, also push to dongle notification queues
+    if device_id == "ADMIN" and to == "all":
+        # Extract the actual message without the prefix if it has one
+        notify_all_players(content, "info")
+    
     return jsonify({"success": True})
 
 @app.route("/api/bounties", methods=["GET"])
@@ -952,7 +992,7 @@ def ws_connect():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("  🎯 IRL Hunts Game Server")
+    print("  🎯 IRL Hunts Game Server v2 (Fixed)")
     print("=" * 60)
     print(f"  Admin Password: {ADMIN_PASSWORD}")
     print(f"  Server URL: http://0.0.0.0:5000")

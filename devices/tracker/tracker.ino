@@ -263,14 +263,34 @@ void displayMain() {
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
   
+  // Special layout for unassigned role - focus on setup instructions
+  if (myRole == "unassigned") {
+    // Line 1: Device ID and connection status
+    drawStatusBar();
+    
+    // Line 2: Clear instruction
+    display.drawString(0, 14, "ROLE NOT SET");
+    
+    // Line 3: What to do
+    display.drawString(0, 26, "Open phone browser:");
+    
+    // Line 4: Scrolling URL
+    drawScrollingText(38, String(SERVER_URL));
+    
+    // Line 5: Final instruction
+    display.drawString(0, 50, "Enter ID: " + NODE_ID);
+    
+    display.display();
+    return;
+  }
+  
+  // Normal display for assigned roles
   // Line 1: Status bar (ID + connection indicators)
   drawStatusBar();
   
   // Line 2: Role and game status
   String line2 = "";
-  if (myRole == "unassigned") {
-    line2 = "Role: NOT SET";
-  } else if (myRole == "pred") {
+  if (myRole == "pred") {
     line2 = "Role: PREDATOR";
   } else if (myRole == "prey") {
     line2 = "Role: PREY";
@@ -319,8 +339,6 @@ void displayMain() {
     } else {
       line5 = "Escapes: " + String(escapeCount) + " | Stay hidden!";
     }
-  } else {
-    line5 = "Set role on phone/browser";
   }
   drawScrollingText(48, line5);
   

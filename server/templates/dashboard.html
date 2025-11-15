@@ -712,7 +712,7 @@
             updatePhase('ended');
         });
         
-        socket.on('new_message', (msg) => {
+        socket.on('message', (msg) => {
             addMessage(msg);
         });
         
