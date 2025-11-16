@@ -2,6 +2,56 @@
 
 Complete testing procedures for development, QA, and production deployment.
 
+
+## ⚠️ Important: Testing Multiple Players
+
+### Session Isolation Warning
+
+When testing multiple players on the same computer:
+
+**DO NOT** use multiple private browsing tabs in the same window!
+- Private tabs in the same window share cookies/sessions
+- This causes names, photos, and roles to "switch" between players
+- Very confusing bugs result!
+
+**CORRECT ways to test multiple players:**
+
+1. **Different Browsers** (Recommended)
+   - Player 1: Chrome
+   - Player 2: Firefox
+   - Player 3: Safari/Edge
+   - Each browser has its own session
+
+2. **Separate Private Windows** (Not tabs!)
+   - Player 1: Chrome Private Window 1
+   - Player 2: Chrome Private Window 2 (NEW WINDOW, not new tab)
+   - Each window is isolated
+
+3. **Different Browser Profiles**
+   - Create Chrome profiles for each test player
+   - Each profile is fully isolated
+
+4. **Different Devices** (Best for realistic testing)
+   - Use actual phones/tablets
+   - Real network conditions
+   - Realistic user experience
+
+### Session Validation
+
+The system now includes automatic session validation:
+- Each login generates a unique session token
+- Dashboard checks session validity every 30 seconds
+- Warning banner appears if session conflict detected
+- Recommends reload or re-login
+
+### What "Session Conflict" Means
+
+If you see "SESSION CONFLICT" warning:
+1. Another login happened in the same browser context
+2. Your session cookie was overwritten
+3. You may see someone else's data
+4. **Solution**: Reload or use different browser
+
 ---
 
 ## 📋 Table of Contents

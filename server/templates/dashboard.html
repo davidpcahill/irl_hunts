@@ -871,7 +871,10 @@
     <script>
     const socket = io();
         const playerId = "{{ player.device_id }}";
+        const expectedSessionToken = sessionStorage.getItem('irlhunts_session_token') || '';
         let playerData = {};
+        let sessionValid = true;
+        
         try {
             playerData = {{ player|tojson }};
         } catch (e) {
@@ -887,6 +890,42 @@
             };
         }
         let isReady = false;
+        
+        // Store device ID in sessionStorage (per-tab, not shared)
+        sessionStorage.setItem('irlhunts_device_id', playerId);
+        sessionStorage.setItem('irlhunts_player_name', playerData.name || '');
+        
+        // Validate session on load
+        async function validateSession() {
+            try {
+                const resp = await fetch('/api/session/validate');
+                const data = await resp.json();
+                
+                if (!data.valid || data.device_id !== playerId) {
+                    console.error('Session mismatch! Expected:', playerId, 'Got:', data.device_id);
+                    sessionValid = false;
+                    showSessionMismatchWarning();
+                    return false;
+                }
+                
+                // Store session token for future validation
+                if (data.session_token) {
+                    sessionStorage.setItem('irlhunts_session_token', data.session_token);
+                }
+                
+                return true;
+            } catch (err) {
+                console.error('Session validation failed:', err);
+                return false;
+            }
+        }
+        
+        function showSessionMismatchWarning() {
+            const warning = document.createElement('div');
+            warning.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #d63031; color: white; padding: 15px; text-align: center; z-index: 9999; font-weight: bold;';
+            warning.innerHTML = '⚠️ SESSION CONFLICT: Another player logged in from this browser. <button onclick="location.reload()" style="background: white; color: #d63031; border: none; padding: 5px 15px; border-radius: 5px; margin-left: 10px; cursor: pointer;">Reload Page</button> or <button onclick="logout()" style="background: transparent; color: white; border: 1px solid white; padding: 5px 15px; border-radius: 5px; margin-left: 5px; cursor: pointer;">Re-login</button>';
+            document.body.prepend(warning);
+        }
         
         // Initialize consent checkboxes from player data
         function initConsent() {
@@ -1010,6 +1049,32 @@
             console.log('Connected to server');
             document.getElementById('connection-dot').className = 'connection-dot connected';
             document.getElementById('connection-text').textContent = 'Connected';
+            // Validate session after reconnect
+            validateSession();
+        });
+        
+        socket.on('session_confirmed', (data) => {
+            console.log('Session confirmed:', data);
+            if (data.device_id !== playerId) {
+                console.error('WebSocket session mismatch!', data.device_id, 'vs', playerId);
+                sessionValid = false;
+                showSessionMismatchWarning();
+            } else {
+                sessionValid = true;
+                if (data.session_token) {
+                    sessionStorage.setItem('irlhunts_session_token', data.session_token);
+                }
+            }
+        });
+        
+        socket.on('profile_update', (data) => {
+            // Update profile pic for specific player (cache busting)
+            if (data.device_id === playerId) {
+                document.getElementById('profile-pic').src = data.profile_pic;
+                document.getElementById('header-pic').src = data.profile_pic;
+            }
+            // Refresh leaderboard to show new pic
+            loadLeaderboard();
         });
         
         socket.on('disconnect', () => {
@@ -1356,6 +1421,12 @@
         let lastKnownStatus = playerData.status;
         
         async function setRole(role) {
+            // Validate session first
+            if (!await validateSession()) {
+                notify('Session error - please reload page', 'error');
+                return;
+            }
+            
             const roleNames = { pred: 'Predator 🦊', prey: 'Prey 🐰' };
             if (!confirm(`Become a ${roleNames[role]}?\n\nThis determines your objective for the game!`)) {
                 return;
@@ -1368,6 +1439,13 @@
                     body: JSON.stringify({role})
                 });
                 if (resp.ok) {
+                    const data = await resp.json();
+                    // Verify response matches our device
+                    if (data.device_id && data.device_id !== playerId) {
+                        notify('Session mismatch! Please reload.', 'error');
+                        showSessionMismatchWarning();
+                        return;
+                    }
                     notify(`You are now a ${role}!`, 'success');
                     location.reload();
                 } else {
@@ -1384,6 +1462,12 @@
         async function uploadProfilePic(input) {
             if (!input.files[0]) return;
             
+            // Validate session first
+            if (!await validateSession()) {
+                notify('Session error - please reload page', 'error');
+                return;
+            }
+            
             const formData = new FormData();
             formData.append('file', input.files[0]);
             
@@ -1395,11 +1479,15 @@
                 
                 if (resp.ok) {
                     const data = await resp.json();
-                    document.getElementById('profile-pic').src = data.url;
-                    document.getElementById('header-pic').src = data.url;
+                    // Force cache refresh by adding timestamp
+                    const url = data.url + (data.url.includes('?') ? '&' : '?') + 'v=' + Date.now();
+                    document.getElementById('profile-pic').src = url;
+                    document.getElementById('header-pic').src = url;
+                    playerData.profile_pic = data.url;
                     notify('Profile picture updated!', 'success');
                 } else {
-                    notify('Failed to upload', 'error');
+                    const errData = await resp.json();
+                    notify(errData.error || 'Failed to upload', 'error');
                 }
             } catch (err) {
                 notify('Upload error', 'error');
@@ -1881,6 +1969,15 @@
             } catch (e) { console.error('initConsent failed:', e); }
         }
         
+        // Validate session before initial load
+        validateSession().then(valid => {
+            if (valid) {
+                console.log('✅ Session valid for', playerId);
+            } else {
+                console.warn('⚠️ Session validation failed');
+            }
+        });
+        
         initialLoad();  // Initialize consent settings
         isReady = playerData.status === 'ready';
         updateReadyButton();
@@ -1899,6 +1996,16 @@
         
         // Fallback: force hide after 5 seconds no matter what
         setTimeout(hideLoadingOverlay, 5000);
+        
+        // Periodic session validation (catch conflicts)
+        setInterval(async () => {
+            if (sessionValid) {
+                const valid = await validateSession();
+                if (!valid) {
+                    notify('Session changed - please reload', 'danger');
+                }
+            }
+        }, 30000);  // Check every 30 seconds
         
         // Periodic updates
         setInterval(loadGameState, 3000);

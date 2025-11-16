@@ -823,7 +823,13 @@
                 tbody.innerHTML = '';
                 let playerCount = 0;
                 
-                for (const [id, p] of Object.entries(players)) {
+                // Sort players by online status, then by name
+                const sortedPlayers = Object.entries(players).sort((a, b) => {
+                    if (a[1].online !== b[1].online) return b[1].online - a[1].online;
+                    return a[1].name.localeCompare(b[1].name);
+                });
+                
+                for (const [id, p] of sortedPlayers) {
                     // Apply filter
                     if (filter === 'online' && !p.online) continue;
                     if (filter === 'offline' && p.online) continue;
@@ -834,7 +840,8 @@
                     const row = document.createElement('tr');
                     const teamBadge = p.team ? `<span class="team-badge">${p.team}</span>` : '';
                     const phoneIcon = p.phone_number ? `<span title="${escapeHtml(p.phone_number)}" style="cursor: pointer;" onclick="alert('Phone: ${escapeHtml(p.phone_number)}')">📞</span>` : '<span style="color: #666;">-</span>';
-                    row.innerHTML = `<td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td><td>${id}</td><td>${escapeHtml(p.name)}</td><td>${phoneIcon}</td><td>${p.role}</td><td>${teamBadge}</td><td><span class="status-badge status-${p.status}">${p.status}</span></td><td>${p.in_safe_zone ? '🏠' : ''}</td><td>
+                    const readyBadge = p.ready || p.status === 'ready' ? '<span style="color: #00b894; font-size: 10px;">✓READY</span>' : '';
+                    row.innerHTML = `<td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td><td title="Device ID">${id}</td><td>${escapeHtml(p.name)} ${readyBadge}</td><td>${phoneIcon}</td><td>${p.role}</td><td>${teamBadge}</td><td><span class="status-badge status-${p.status}">${p.status}</span></td><td>${p.in_safe_zone ? '🏠' : ''}</td><td>
                         <button class="btn btn-small btn-primary" onclick="addMod('${id}')" title="Add moderator">+Mod</button>
                         ${p.status === 'captured' ? `<button class="btn btn-small btn-success" onclick="releasePlayer('${id}')" title="Release from capture">Free</button>` : ''}
                         <button class="btn btn-small btn-warning" onclick="forceRole('${id}', '${p.role === 'pred' ? 'prey' : 'pred'}')" title="Swap role">Swap</button>

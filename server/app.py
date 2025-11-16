@@ -693,6 +693,12 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if "device_id" not in session:
             return jsonify({"error": "Not logged in"}), 401
+        # Validate session integrity
+        device_id = session.get("device_id")
+        if device_id != "ADMIN" and device_id not in players:
+            # Session references non-existent player, clear it
+            session.clear()
+            return jsonify({"error": "Session expired, please login again"}), 401
         return f(*args, **kwargs)
     return decorated
 
@@ -752,7 +758,11 @@ def api_login():
     if len(device_id) > 10:
         return jsonify({"error": "Device ID too long"}), 400
     
+    # Generate unique session token to identify this specific browser tab
+    session_token = secrets.token_hex(16)
+    
     session["device_id"] = device_id
+    session["session_token"] = session_token
     session.permanent = True
     player = get_player(device_id)
     
@@ -763,8 +773,13 @@ def api_login():
     if player["status"] == "offline":
         player["status"] = "lobby"
     
-    log_event("web_login", {"player": player["name"]})
-    return jsonify({"success": True, "player": player})
+    log_event("web_login", {"player": player["name"], "device": device_id})
+    return jsonify({
+        "success": True, 
+        "player": player, 
+        "session_token": session_token,
+        "device_id": device_id
+    })
 
 @app.route("/api/admin_login", methods=["POST"])
 def api_admin_login():
@@ -916,12 +931,33 @@ def api_upload_photo():
     if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
         return jsonify({"error": "Invalid file type"}), 400
     
-    base_filename = f"profile_{device_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    # Remove old profile pic if exists (to prevent buildup)
+    if player.get("profile_pic"):
+        old_pic_path = player["profile_pic"].replace("/uploads/", "")
+        old_pic_full = os.path.join(app.config['UPLOAD_FOLDER'], old_pic_path)
+        if os.path.exists(old_pic_full) and old_pic_path.startswith("profile_"):
+            try:
+                os.remove(old_pic_full)
+            except:
+                pass
+    
+    # Use timestamp to ensure unique URL (cache busting)
+    timestamp = int(time.time())
+    base_filename = f"profile_{device_id}_{timestamp}_{uuid.uuid4().hex[:4]}.{ext}"
     filename = secure_filename(base_filename)
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     
-    player["profile_pic"] = f"/uploads/{filename}"
-    log_event("photo_upload", {"player": player["name"], "type": "profile"})
+    # Add cache-busting query param
+    player["profile_pic"] = f"/uploads/{filename}?t={timestamp}"
+    log_event("photo_upload", {"player": player["name"], "type": "profile", "device": device_id})
+    
+    # Broadcast update to all clients
+    socketio.emit("profile_update", {
+        "device_id": device_id,
+        "profile_pic": player["profile_pic"],
+        "name": player["name"]
+    }, room="all")
+    
     return jsonify({"success": True, "url": player["profile_pic"]})
 
 @app.route("/api/players", methods=["GET"])
@@ -1535,6 +1571,7 @@ def api_reset_game():
         p["infections"] = 0
         p["nearby_players"] = []
         p["last_rssi"] = {}
+        p["ready"] = False
         # Keep nickname and profile_pic - they worked hard on those!
     
     for team in team_scores:
@@ -1542,7 +1579,22 @@ def api_reset_game():
     
     capture_cooldowns.clear()
     sighting_cooldowns.clear()
-    log_event("game_reset", {})
+    bounties.clear()
+    
+    # Clear sighting photos (keep profile pics)
+    import glob
+    sighting_files = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], "sighting_*"))
+    for f in sighting_files:
+        try:
+            os.remove(f)
+        except:
+            pass
+    
+    # Clear events (keep some history)
+    global events
+    events = events[-50:]  # Keep last 50 events
+    
+    log_event("game_reset", {"sightings_cleared": len(sighting_files)})
     notify_all_players("Game reset to lobby", "info")
     socketio.emit("game_reset", {}, room="all")
     return jsonify({"success": True})
@@ -1947,6 +1999,32 @@ def api_consent_summary():
             }
     return jsonify(summary)
 
+
+@app.route("/api/session/validate", methods=["GET"])
+def api_validate_session():
+    """Validate that client session matches server session"""
+    if "device_id" not in session:
+        return jsonify({"valid": False, "error": "No session"}), 401
+    
+    device_id = session.get("device_id")
+    session_token = session.get("session_token", "")
+    
+    if device_id == "ADMIN":
+        return jsonify({"valid": True, "device_id": "ADMIN", "is_admin": True})
+    
+    if device_id not in players:
+        session.clear()
+        return jsonify({"valid": False, "error": "Player not found"}), 401
+    
+    player = players[device_id]
+    return jsonify({
+        "valid": True,
+        "device_id": device_id,
+        "session_token": session_token,
+        "player_name": player["name"],
+        "is_admin": False
+    })
+
 # =============================================================================
 # WEBSOCKET
 # =============================================================================
@@ -1955,10 +2033,17 @@ def api_consent_summary():
 def ws_connect():
     join_room("all")
     if "device_id" in session:
-        join_room(session["device_id"])
-        if session["device_id"] in players:
-            players[session["device_id"]]["online"] = True
-            players[session["device_id"]]["last_ping"] = time.time()
+        device_id = session["device_id"]
+        join_room(device_id)
+        if device_id in players:
+            players[device_id]["online"] = True
+            players[device_id]["last_ping"] = time.time()
+        # Send confirmation to client with their identity
+        emit("session_confirmed", {
+            "device_id": device_id,
+            "session_token": session.get("session_token", ""),
+            "is_admin": session.get("is_admin", False)
+        })
 
 @socketio.on("heartbeat")
 def ws_heartbeat():

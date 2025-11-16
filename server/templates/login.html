@@ -270,6 +270,9 @@
                     2. Enter it above with an optional nickname<br>
                     3. Choose your role: Prey 🐰 or Predator 🦊
                 </p>
+                <p style="color: #ff7675; margin-top: 10px; font-size: 12px;">
+                    ⚠️ <strong>Testing Note:</strong> If testing multiple players on same device, use different browsers (Chrome + Firefox) or separate private windows (not tabs in same window).
+                </p>
                 <button onclick="localStorage.removeItem('irlhunts_device_id'); document.getElementById('device_id').value=''; this.textContent='Cleared!'; setTimeout(() => this.textContent='Clear Saved ID', 2000);" 
                         style="margin-top: 10px; background: rgba(255,255,255,0.1); border: none; color: #888; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 11px;">
                     Clear Saved ID
@@ -352,6 +355,12 @@
                 
                 const data = await resp.json();
                 if (data.success) {
+                    // Store session token in sessionStorage (per-tab)
+                    if (data.session_token) {
+                        sessionStorage.setItem('irlhunts_session_token', data.session_token);
+                    }
+                    sessionStorage.setItem('irlhunts_device_id', deviceId);
+                    
                     // Set nickname and phone if provided
                     if (nickname || phoneNumber) {
                         await fetch('/api/player', {
