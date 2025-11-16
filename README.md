@@ -132,9 +132,16 @@ Server runs at `http://YOUR_IP:5000`
 ### 3. Set Up Safe Zones (5 minutes each)
 
 1. Flash `devices/beacon/beacon.ino` to spare Heltec V3
-2. Place at designated safe zone location
-3. Note beacon ID from OLED (e.g., `SZ1A2B`)
-4. Register in admin panel
+2. Beacon auto-generates unique ID (e.g., `SZ1A2B`)
+3. Place at designated safe zone location with USB power bank
+4. Register in admin panel with appropriate RSSI threshold
+5. Test by walking near beacon - tracker should show "Entered safe zone"
+
+**Beacon Features (v3):**
+- Battery monitoring with low-power warnings
+- Health reporting every 5 minutes (Serial Monitor)
+- LED patterns indicate status
+- Auto-recovery from LoRa errors
 
 ### 4. Play!
 

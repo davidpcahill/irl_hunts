@@ -568,13 +568,21 @@ def update_safe_zone(device_id, beacon_rssi):
     nearest_beacon = None
     best_rssi = -999
     
+    # Track all detected beacons for debugging
+    detected_beacons = []
+    
     for beacon_id, rssi in beacon_rssi.items():
         if beacon_id in beacons and beacons[beacon_id].get("active", True):
             threshold = beacons[beacon_id].get("rssi", DEFAULT_SAFEZONE_RSSI)
+            detected_beacons.append(f"{beacon_id}:{rssi}dB(thresh:{threshold})")
             if rssi >= threshold and rssi > best_rssi:
                 is_safe = True
                 nearest_beacon = beacon_id
                 best_rssi = rssi
+        elif beacon_id not in beacons:
+            # Unknown beacon detected - log for admin awareness
+            if beacon_id.startswith("SZ"):
+                log_event("unknown_beacon", {"beacon_id": beacon_id, "rssi": rssi, "player": player["name"]}, broadcast=False)
     
     if is_safe and not was_safe:
         player["in_safe_zone"] = True
@@ -1263,6 +1271,9 @@ def api_tracker_ping():
     captured_by_name = player.get("captured_by", "")
     captured_by_device = player.get("captured_by_device", "")
     
+    # Only return active beacons
+    active_beacon_ids = [bid for bid, b in beacons.items() if b.get("active", True)]
+    
     return jsonify({
         "phase": game["phase"],
         "status": player["status"],
@@ -1272,7 +1283,7 @@ def api_tracker_ping():
         "team": team_value,
         "notifications": notifs,
         "settings": game["settings"],
-        "beacons": list(beacons.keys()),
+        "beacons": active_beacon_ids,
         "game_mode": game["mode"],
         "game_mode_name": mode_config["name"],
         "emergency": game["emergency"],
@@ -2116,7 +2127,16 @@ def api_server_info():
     import glob
     upload_count = len(glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], "*")))
     
+    # Calculate memory usage
+    try:
+        import psutil
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+    except:
+        memory_mb = 0
+    
     return jsonify({
+        "server_version": "4.1",
         "uptime_seconds": time.time() - server_start_time,
         "total_events": len(events),
         "total_messages": len(messages),
@@ -2125,6 +2145,11 @@ def api_server_info():
         "upload_count": upload_count,
         "moderators": list(moderators),
         "python_version": sys.version,
+        "memory_mb": round(memory_mb, 2),
+        "active_beacons": len([b for b in beacons.values() if b.get("active", True)]),
+        "total_beacons": len(beacons),
+        "capture_cooldowns_active": len(capture_cooldowns),
+        "sighting_cooldowns_active": len(sighting_cooldowns),
     })
 
 # Track server start time

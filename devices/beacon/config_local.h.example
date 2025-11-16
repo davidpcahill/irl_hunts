@@ -15,10 +15,10 @@
 #define CONFIG_LOCAL_H
 
 // =============================================================================
-// BEACON SETTINGS
+// REQUIRED: LoRa Frequency - MUST MATCH TRACKERS!
 // =============================================================================
 
-// LoRa frequency - MUST match your tracker devices!
+// LoRa frequency for your region:
 // - Americas: 915.0 (default)
 // - Europe: 868.0  
 // - Asia: 433.0
@@ -30,12 +30,24 @@
 
 // How often to broadcast (milliseconds)
 // Lower = detected faster, but uses more power
+// Default: 2000 (2 seconds)
 // #define BEACON_BROADCAST_INTERVAL 2000
 
-// LoRa radio settings (must match trackers!)
-// #define LORA_SF 7           // Spreading factor (7-12)
-// #define LORA_BW 125.0       // Bandwidth in kHz
-// #define LORA_CR 5           // Coding rate (5-8)
-// #define LORA_TX_POWER 14    // Transmit power (2-20 dBm)
+// LoRa radio settings (MUST match trackers exactly!)
+// Only change these if you also changed them in tracker config
+// #define LORA_SF 7             // Spreading factor (7-12)
+// #define LORA_BW 125.0         // Bandwidth in kHz
+// #define LORA_CR 5             // Coding rate (5-8)
+// #define LORA_TX_POWER 14      // Transmit power (2-20 dBm)
+// #define LORA_SYNC_WORD 0x34   // Sync word (must match all devices)
+
+// Battery monitoring thresholds
+// #define BATTERY_LOW_VOLTAGE 3.3      // Warn below this (volts)
+// #define BATTERY_CRITICAL_VOLTAGE 3.0 // Critical below this
+
+// Custom hardware pins (only if using different board)
+// #define PIN_LORA_NSS 8
+// #define PIN_LED 35
+// #define PIN_BATTERY_ADC 1
 
 #endif // CONFIG_LOCAL_H

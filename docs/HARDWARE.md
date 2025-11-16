@@ -397,6 +397,103 @@ If trackers show "No players nearby" even when devices are close:
 
 ---
 
+
+## 🔧 Beacon-Specific Troubleshooting
+
+### Beacon Not Detected by Trackers
+
+**Symptoms:**
+- Tracker shows "No safe zones detected"
+- Players can't escape when near beacon
+
+**Solutions:**
+
+1. **Check LoRa frequency match**
+```cpp
+   // Beacon config_local.h
+   #define LORA_FREQUENCY 915.0
+   
+   // Tracker config_local.h
+   #define LORA_FREQUENCY 915.0  // Must be identical!
+```
+
+2. **Verify beacon is registered in admin panel**
+   - Go to Admin Panel → Safe Zone Beacons
+   - Add beacon with exact ID shown on beacon's OLED
+   - Set appropriate RSSI threshold (-75 is standard)
+
+3. **Check RSSI threshold isn't too strict**
+   - `-60` = Must be very close (< 5m)
+   - `-75` = Standard range (~10-15m)
+   - `-85` = Extended range (~20-30m)
+   - Test by walking near beacon and checking Serial Monitor
+
+4. **Antenna issues**
+   - Ensure antenna is firmly connected
+   - Antenna frequency must match LoRa frequency
+   - Don't cover antenna with hand/case
+
+5. **Serial Monitor debugging**
+```
+   // On beacon, look for:
+   TX #1: SZ1234|SAFEZONE|3.0
+   TX #2: SZ1234|SAFEZONE|3.0
+   ...
+   
+   // On tracker, look for:
+   RX from SZ1234 (SAFEZONE) RSSI: -65dB
+```
+
+### Beacon Battery Issues
+
+**Low Battery Warnings:**
+- OLED shows "! Battery Low !"
+- LED blinks faster than normal
+- Check voltage on display
+
+**Solutions:**
+- Charge via USB-C
+- Use larger battery pack (2000+ mAh recommended)
+- Beacons use less power than trackers (~10-15 hours on 1000mAh)
+
+### Beacon Not Broadcasting
+
+**Check Serial Monitor (115200 baud):**
+```
+=== BEACON HEALTH REPORT ===
+TX Count: 150      // Should increase every 2s
+Errors: 0          // Should be 0 or very low
+```
+
+**If TX Count not increasing:**
+- LoRa initialization failed (check error code)
+- Hardware issue with radio
+- Try resetting beacon
+
+**If high error count:**
+- Antenna disconnected
+- Radio module damaged
+- Interference (move away from other electronics)
+
+### Multiple Beacons Interfering
+
+If you have multiple beacons close together:
+- Each has unique ID (based on MAC address)
+- Trackers track strongest signal
+- Stagger beacon placement (10+ meters apart recommended)
+- Can disable beacons in admin if needed
+
+### Beacon Uptime & Reliability
+
+For long games (4+ hours):
+- Use USB power bank (10000+ mAh)
+- Monitor health reports in Serial Monitor
+- Check free heap memory stays stable
+- Beacon v3 includes memory leak protection
+
+---
+
+
 ## 🏗️ Scaling Up
 
 ### Many Devices
