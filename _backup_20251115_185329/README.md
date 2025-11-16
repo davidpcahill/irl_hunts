@@ -380,15 +380,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Open GitHub issue for bugs
 - Serial Monitor (115200 baud) for device debug
 - Browser console (F12) for web issues
-- LoRa packet format: `ID|role|consent` (e.g., `T9EF0|pred|STD`)
-
-### Common LoRa Issues
-If trackers show "No players nearby" when devices are close:
-1. Open Serial Monitor (115200 baud) on both devices
-2. Verify TX messages: `TX #1: T1234|pred|STD` (3 parts with `|`)
-3. Verify RX messages: `RX from T5678 (prey) RSSI: -45dB | Total nearby: 1`
-4. Check frequencies match (915.0 MHz for Americas)
-5. Ensure antennas are connected securely
 
 ---
 

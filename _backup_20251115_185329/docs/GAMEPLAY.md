@@ -548,19 +548,12 @@ Players can set their consent preferences:
 - **Photo Visible** (default ON): Allow photos to be taken
 - **Location Share** (default ON): Share location hints with other players
 
-Consent badges appear on tracker displays (in square brackets) and are broadcast via LoRa:
+Consent badges appear on tracker displays (in square brackets):
 - `[STD]` = Standard (default settings - photo and location ON, physical OFF)
 - `[T]` = Touch/Physical tag OK (has enabled physical contact)
 - `[NP]` = No Photos please (has disabled photo visibility)
 - `[NL]` = No Location sharing (has disabled location hints)
 - Badges combine: `[TNP]` = Touch OK but No Photos
-
-**LoRa Broadcast Format:** `DeviceID|Role|ConsentBadge`
-Examples:
-- `T9EF0|pred|T` = Tracker T9EF0, predator role, physical contact OK
-- `TA2B3|prey|STD` = Tracker TA2B3, prey role, standard settings
-
-This allows nearby players to see consent preferences before interaction.
 
 **ALWAYS respect consent settings!** If someone has disabled a feature, do not attempt to circumvent it.
 

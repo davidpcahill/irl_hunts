@@ -391,20 +391,12 @@ void displayMain() {
   
   String line5 = "";
   if (playerRssi.size() == 0) line5 = "No players nearby";
-  else if (playerRssi.size() == 1) {
-    int strongest = -999; String strongestId = "";
-    for (auto& p : playerRssi) {
-      strongest = p.second; strongestId = p.first;
-    }
-    line5 = (myRole == "pred" ? "Target: " : "Threat: ") + strongestId + " (" + String(strongest) + "dB)";
-  } else {
-    // Multiple players - show count and closest
+  else {
     int strongest = -999; String strongestId = "";
     for (auto& p : playerRssi) {
       if (p.second > strongest) { strongest = p.second; strongestId = p.first; }
     }
-    String prefix = (myRole == "pred" ? "🎯 " : "⚠️ ");
-    line5 = prefix + String(playerRssi.size()) + " nearby | Best: " + strongestId + " " + String(strongest) + "dB";
+    line5 = (myRole == "pred" ? "Target: " : "Threat: ") + strongestId + " (" + String(strongest) + "dB)";
   }
   drawScrollingText(48, line5);
   display.display();
@@ -479,24 +471,12 @@ void receivePackets() {
     int sep = packet.indexOf('|');
     if (sep > 0) {
       String id = packet.substring(0, sep);
-      String typeAndConsent = packet.substring(sep + 1);
-      
-      // CRITICAL FIX: Parse consent badge BEFORE checking type!
-      // Packet format: ID|role|consent (e.g., "T1234|pred|STD")
-      String type = typeAndConsent;
-      String otherConsent = "STD";
-      int sep2 = typeAndConsent.indexOf('|');
-      if (sep2 > 0) {
-        type = typeAndConsent.substring(0, sep2);  // Extract just the role
-        otherConsent = typeAndConsent.substring(sep2 + 1);  // Extract consent badge
-      }
-      
+      String type = packet.substring(sep + 1);
       if (id != NODE_ID) {
         if (type == "SAFEZONE" || type == "BEACON") {
           beaconRssi[id] = (int)rssi;
         } else if (type == "pred" || type == "prey" || type == "unknown") {
-          bool isNewPlayer = (playerRssi.count(id) == 0);
-          int oldRssi = isNewPlayer ? -999 : playerRssi[id];
+          int oldRssi = playerRssi.count(id) ? playerRssi[id] : -999;
           playerRssi[id] = (int)rssi;
           rxCount++;
           
@@ -510,47 +490,29 @@ void receivePackets() {
           Serial.print("dB | Total nearby: ");
           Serial.println(playerRssi.size());
           
-          // NEW PLAYER DETECTION - Priority alerts!
-          if (isNewPlayer && !emergencyActive && gamePhase == "running") {
-            if (myRole == "prey" && type == "pred") {
-              showNotification("⚠️ NEW PREDATOR DETECTED! " + id, "danger");
-            } else if (myRole == "pred" && type == "prey") {
-              showNotification("🎯 NEW PREY SPOTTED! " + id, "success");
-            }
+          // Parse consent badge if present (format: ID|role|consent)
+          int sep2 = packet.indexOf('|', sep + 1);
+          String otherConsent = "STD";
+          if (sep2 > 0) {
+            otherConsent = packet.substring(sep2 + 1);
           }
           
-          // Proximity warnings for prey (enhanced with player count)
+          // Proximity warnings for prey
           if (!emergencyActive && myRole == "prey" && type == "pred" && !inSafeZone) {
             bool approaching = (oldRssi != -999 && (int)rssi > oldRssi + 3);
-            int predCount = 0;
-            for (auto& p : playerRssi) {
-              // Count predators (we can't know role from RSSI map alone, but we can warn about multiple signals)
-              if (p.second > -80) predCount++;
-            }
             
             if (rssi > -50) {
-              showNotification("🚨 CRITICAL! Predator RIGHT HERE!", "danger");
+              showNotification("CRITICAL! Predator RIGHT HERE!", "danger");
             } else if (rssi > -55) {
-              if (predCount > 1) {
-                showNotification("🚨 DANGER! Multiple threats very close!", "danger");
-              } else {
-                showNotification("🚨 DANGER! Predator very close!", "danger");
-              }
+              showNotification("DANGER! Predator very close!", "danger");
             } else if (rssi > -65) {
               if (approaching) {
-                showNotification("⚠️ Predator approaching fast!", "danger");
+                showNotification("WARNING! Predator approaching fast!", "danger");
               } else {
-                showNotification("⚠️ Predator nearby (" + String(playerRssi.size()) + " total)", "warning");
+                showNotification("Predator nearby", "warning");
               }
             } else if (rssi > -75 && approaching) {
-              showNotification("📡 Predator detected, moving closer", "warning");
-            }
-          }
-          
-          // Alert predators about multiple prey
-          if (!emergencyActive && myRole == "pred" && type == "prey" && !isNewPlayer) {
-            if (rssi > -60 && oldRssi < -70) {
-              showNotification("🎯 Prey " + id + " now in range!", "success");
+              showNotification("Predator detected, moving closer", "warning");
             }
           }
         }
