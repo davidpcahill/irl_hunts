@@ -74,16 +74,14 @@ irlhunts/
 │       ├── config.h             # Default device settings (documented)
 │       ├── config_local.h.example  # Template for your settings
 │       └── config_local.h       # YOUR settings (gitignored, you create this)
-├── docs/                        # Documentation
-│   ├── SETUP.md                 # Detailed setup guide
-│   ├── GAMEPLAY.md              # Game rules and strategies
-│   ├── HARDWARE.md              # Hardware requirements
-│   ├── CONFIG.md                # Configuration options reference
-│   ├── CONFIG_SYSTEM.md         # How the config system works
-│   └── TEST.md                  # Testing procedures
-└── patches/                     # Maintenance scripts
-    ├── patch_gitignore.py       # Ensures credentials are gitignored
-    └── irlhunts_patch.py        # Fixes config issues and bugs
+└── docs/                        # Documentation
+    ├── SETUP.md                 # Detailed setup guide
+    ├── GAMEPLAY.md              # Game rules and strategies
+    ├── API.md                   # API reference
+    ├── HARDWARE.md              # Hardware requirements
+    ├── CONFIG.md                # Configuration options reference
+    ├── CONFIG_SYSTEM.md         # How the config system works
+    └── TEST.md                  # Testing procedures
 ```
 
 
