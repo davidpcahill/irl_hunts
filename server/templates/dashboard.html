@@ -655,6 +655,15 @@
                     <span class="stat-label">Team</span>
                     <span class="stat-value" id="your-team">-</span>
                 </div>
+                <div class="stat-row">
+                    <span class="stat-label">📞 Emergency</span>
+                    <span class="stat-value">
+                        <input type="tel" id="your-phone" value="{{ player.phone_number or '' }}" 
+                               placeholder="555-123-4567" maxlength="20"
+                               style="background: transparent; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; color: #fff; width: 120px; font-size: 12px;"
+                               onchange="updatePhoneNumber()">
+                    </span>
+                </div>
                 
                 <div id="photo-requirement" class="photo-requirement-warning" style="display: none;">
                     📸 <strong>Photo Safari Mode:</strong> You must photograph prey before you can capture them!
@@ -1283,6 +1292,11 @@
                 updateConsentBadge();
             }
             
+            // Sync phone number
+            if (player.phone_number !== undefined) {
+                document.getElementById('your-phone').value = player.phone_number || '';
+            }
+            
             // Sync ready state
             isReady = player.status === 'ready' || player.ready === true;
             updateReadyButton();
@@ -1293,6 +1307,11 @@
                 document.getElementById('consent-photo').checked = player.consent_flags.photo_visible !== false;
                 document.getElementById('consent-location').checked = player.consent_flags.location_share !== false;
                 updateConsentBadge();
+            }
+            
+            // Sync phone number
+            if (player.phone_number !== undefined) {
+                document.getElementById('your-phone').value = player.phone_number || '';
             }
             
             if (player.profile_pic) {
@@ -1891,6 +1910,25 @@
         
         // Initial stats load
         loadStats();
+        
+        // Update phone number
+        async function updatePhoneNumber() {
+            const phone = document.getElementById('your-phone').value.trim();
+            try {
+                const resp = await fetch('/api/player', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({phone_number: phone})
+                });
+                if (resp.ok) {
+                    notify('Emergency contact updated', 'success');
+                } else {
+                    notify('Failed to update phone', 'error');
+                }
+            } catch (err) {
+                notify('Connection error', 'error');
+            }
+        }
         
         // Enter to send message
         document.getElementById('msg-input').addEventListener('keypress', (e) => {

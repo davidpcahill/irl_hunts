@@ -275,7 +275,19 @@ def log_event(event_type, data, broadcast=True):
         events.pop(0)
     if broadcast:
         socketio.emit("event", event, room="all")
-    print(f"[{now_str()}] {event_type}: {data}")
+    
+    # Enhanced logging for emergencies
+    if event_type == "emergency_triggered":
+        print(f"[{now_str()}] *** EMERGENCY ***")
+        print(f"  Player: {data.get('player_name', 'Unknown')}")
+        print(f"  Device: {data.get('device_id', 'Unknown')}")
+        print(f"  Reason: {data.get('reason', 'Not specified')}")
+        print(f"  Location: {data.get('location_hint', 'Unknown')}")
+        nearest = data.get('nearest_to_emergency', [])
+        if nearest:
+            print(f"  Nearest players: {', '.join([f"{p['name']} ({p['rssi']}dB)" for p in nearest[:5]])}")
+    else:
+        print(f"[{now_str()}] {event_type}: {data}")
     return event
 
 MAX_PLAYERS = 100  # Reasonable limit for memory/performance
@@ -316,7 +328,8 @@ def get_player(device_id):
                 "photo_visible": True,  # Allow photos to be taken
                 "location_share": True  # Share location hints
             },
-            "ready": False
+            "ready": False,
+            "phone_number": ""  # Emergency contact number (optional)
         }
         log_event("player_join", {"id": device_id, "name": f"Player_{device_id[-4:]}"})
     return players[device_id]
@@ -588,7 +601,8 @@ def trigger_emergency(device_id, reason=""):
         "location_hint": player.get("last_location_hint", "Unknown"),
         "nearby_players": player.get("nearby_players", []),
         "nearest_to_emergency": nearest_players[:5],
-        "time": now_str()
+        "time": now_str(),
+        "phone_number": player.get("phone_number", "")  # For emergency contact
     }
     
     log_event("emergency_triggered", emergency_data)
@@ -867,6 +881,16 @@ def api_update_player():
             if key in data["consent_flags"]:
                 player["consent_flags"][key] = bool(data["consent_flags"][key])
         log_event("consent_update", {"player": player["name"], "flags": player["consent_flags"]})
+    
+    # Update phone number if provided (sanitize input)
+    if "phone_number" in data:
+        phone = str(data["phone_number"]).strip()
+        # Only allow digits, spaces, dashes, parentheses, plus sign
+        phone = "".join(c for c in phone if c.isdigit() or c in " -+().")
+        phone = phone[:20]  # Max 20 characters
+        player["phone_number"] = phone
+        if phone:
+            log_event("phone_update", {"player": player["name"], "has_phone": True})
     
     player["last_seen"] = now()
     player["last_ping"] = time.time()

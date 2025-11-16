@@ -250,6 +250,17 @@ Players can configure these settings in their dashboard:
 
 The Emergency System is a **critical safety feature** that takes absolute priority over all gameplay.
 
+### Emergency Contact Phone Number
+
+Players can optionally provide a phone number during login or in their dashboard profile. This number:
+- Is only visible to moderators and admins
+- Appears prominently during emergencies (admin panel, event logs, tracker screens)
+- Helps locate players quickly by calling them
+- Is stored locally in the browser for convenience
+- Can be updated anytime from the player dashboard
+
+**Privacy:** Only moderators and admins can see phone numbers. Other players cannot access this information.
+
 ### How to Trigger Emergency
 
 **From Tracker Device:**

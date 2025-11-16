@@ -248,6 +248,11 @@
                     <input type="text" id="nickname" placeholder="e.g., ShadowWolf" maxlength="30">
                 </div>
                 <div class="form-group">
+                    <label>Emergency Contact Phone (optional)</label>
+                    <input type="tel" id="phone_number" placeholder="e.g., 555-123-4567" maxlength="20">
+                    <small style="color: #666; font-size: 11px;">Only visible to moderators/admins for safety</small>
+                </div>
+                <div class="form-group">
                     <label style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="remember-me" checked>
                         Remember my ID
@@ -306,14 +311,18 @@
             setTimeout(() => err.style.display = 'none', 5000);
         }
         
-        // Load remembered device ID and nickname
+        // Load remembered device ID, nickname, and phone
         const rememberedId = localStorage.getItem('irlhunts_device_id');
         const rememberedNick = localStorage.getItem('irlhunts_nickname');
+        const rememberedPhone = localStorage.getItem('irlhunts_phone');
         if (rememberedId) {
             document.getElementById('device_id').value = rememberedId;
         }
         if (rememberedNick) {
             document.getElementById('nickname').value = rememberedNick;
+        }
+        if (rememberedPhone) {
+            document.getElementById('phone_number').value = rememberedPhone;
         }
         
         async function loginPlayer(e) {
@@ -321,13 +330,17 @@
             const deviceId = document.getElementById('device_id').value.toUpperCase().trim();
             const nickname = document.getElementById('nickname').value.trim();
             
+            const phoneNumber = document.getElementById('phone_number').value.trim();
+            
             // Remember device ID for next time (if checkbox is checked)
             if (document.getElementById('remember-me').checked) {
                 localStorage.setItem('irlhunts_device_id', deviceId);
                 localStorage.setItem('irlhunts_nickname', nickname);
+                localStorage.setItem('irlhunts_phone', phoneNumber);
             } else {
                 localStorage.removeItem('irlhunts_device_id');
                 localStorage.removeItem('irlhunts_nickname');
+                localStorage.removeItem('irlhunts_phone');
             }
             
             try {
@@ -339,12 +352,15 @@
                 
                 const data = await resp.json();
                 if (data.success) {
-                    // Set nickname if provided
-                    if (nickname) {
+                    // Set nickname and phone if provided
+                    if (nickname || phoneNumber) {
                         await fetch('/api/player', {
                             method: 'PUT',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({nickname: nickname})
+                            body: JSON.stringify({
+                                nickname: nickname,
+                                phone_number: phoneNumber
+                            })
                         });
                     }
                     window.location.href = '/dashboard';

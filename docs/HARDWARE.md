@@ -358,6 +358,25 @@ Tracker firmware includes:
 3. I2C address correct (0x3C)?
 4. Wiring (if external)
 
+
+### "No Players Nearby" Issue
+If trackers show "No players nearby" even when devices are close:
+
+1. **Check LoRa frequency matches** - All devices must use same frequency (915.0 MHz for Americas)
+2. **Verify antennas connected** - Missing antenna = no radio signal
+3. **Check Serial Monitor** - Look for "TX #" and "RX #" counts incrementing
+4. **Distance test** - Move devices closer together (within 10m)
+5. **Same LoRa parameters** - SF7, BW 125kHz, CR 5, Sync Word 0x34 must match
+
+**Debug Steps:**
+```
+1. Open Serial Monitor (115200 baud)
+2. Look for: "TX #1: TXXXX|prey" (sending beacons)
+3. Look for: "RX from TXXXX" (receiving packets)
+4. If TX but no RX: other device not transmitting or out of range
+5. If no TX: LoRa init failed, check error code
+```
+
 ### LoRa Not Working
 1. Antenna connected?
 2. Frequency correct?

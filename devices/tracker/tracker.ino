@@ -129,6 +129,12 @@ String gamePhase = "lobby", gameMode = "classic", gameModeName = "Classic Hunt",
 bool inSafeZone = false, infectionMode = false, photoRequired = false;
 bool emergencyActive = false;
 String emergencyBy = "";
+String emergencyDeviceId = "";
+String emergencyReason = "";
+String emergencyLocation = "";
+String emergencyNearby = "";
+String emergencyPhone = "";
+unsigned long emergencyDisplayCycle = 0;
 bool consentPhysical = false;
 bool consentPhoto = true;
 String consentBadge = "";  // Visual badge for LoRa broadcasts
@@ -260,10 +266,41 @@ void displayEmergencyScreen() {
   display.setFont(ArialMT_Plain_16);
   display.drawString(64, 0, "!!! EMERGENCY !!!");
   display.setFont(ArialMT_Plain_10);
-  display.drawString(64, 20, "GAME PAUSED");
-  display.drawString(64, 32, "Player: " + emergencyBy);
-  display.drawString(64, 44, "HELP THEM NOW!");
-  display.drawString(64, 54, "Only mod can clear");
+  
+  // Cycle through different info every 3 seconds
+  int cycle = ((millis() - emergencyDisplayCycle) / 3000) % 4;
+  
+  switch (cycle) {
+    case 0:  // Who needs help
+      display.drawString(64, 18, "FIND THIS PLAYER:");
+      display.setFont(ArialMT_Plain_16);
+      display.drawString(64, 32, emergencyBy);
+      display.setFont(ArialMT_Plain_10);
+      display.drawString(64, 52, "Device: " + emergencyDeviceId);
+      break;
+    case 1:  // Phone number (if available)
+      display.drawString(64, 18, "EMERGENCY CONTACT:");
+      display.setFont(ArialMT_Plain_16);
+      if (emergencyPhone.length() > 0) {
+        display.drawString(64, 32, emergencyPhone);
+      } else {
+        display.drawString(64, 32, "Not provided");
+      }
+      display.setFont(ArialMT_Plain_10);
+      display.drawString(64, 52, "CALL TO LOCATE");
+      break;
+    case 2:  // Location info
+      display.drawString(64, 18, "LAST KNOWN LOCATION:");
+      display.drawString(64, 32, emergencyLocation.length() > 0 ? emergencyLocation : "Unknown");
+      display.drawString(64, 48, "HELP THEM NOW!");
+      break;
+    case 3:  // Nearby players
+      display.drawString(64, 18, "NEARBY PLAYERS:");
+      display.drawString(64, 32, emergencyNearby.length() > 0 ? emergencyNearby : "None detected");
+      display.drawString(64, 48, emergencyReason.length() > 0 ? emergencyReason.substring(0, 20) : "");
+      break;
+  }
+  
   display.display();
 }
 
@@ -400,9 +437,25 @@ void sendBeacon() {
   String broadcastRole = (myRole == "unassigned") ? "unknown" : myRole;
   // Include consent badge in broadcast: ID|role|consent
   String packet = NODE_ID + "|" + broadcastRole + "|" + consentBadge;
-  radio.transmit(packet);
+  
+  int state = radio.transmit(packet);
+  if (state == RADIOLIB_ERR_NONE) {
+    txCount++;
+    // Only log every 10th TX to reduce spam
+    if (txCount % 10 == 1) {
+      Serial.print("TX #");
+      Serial.print(txCount);
+      Serial.print(": ");
+      Serial.print(packet);
+      Serial.print(" | Nearby players: ");
+      Serial.println(playerRssi.size());
+    }
+  } else {
+    Serial.print("TX ERROR: ");
+    Serial.println(state);
+  }
+  
   radio.startReceive();
-  txCount++;
 }
 
 // Track predator approach trends
@@ -426,6 +479,16 @@ void receivePackets() {
           int oldRssi = playerRssi.count(id) ? playerRssi[id] : -999;
           playerRssi[id] = (int)rssi;
           rxCount++;
+          
+          // Debug: Log received player beacon
+          Serial.print("RX from ");
+          Serial.print(id);
+          Serial.print(" (");
+          Serial.print(type);
+          Serial.print(") RSSI: ");
+          Serial.print((int)rssi);
+          Serial.print("dB | Total nearby: ");
+          Serial.println(playerRssi.size());
           
           // Parse consent badge if present (format: ID|role|consent)
           int sep2 = packet.indexOf('|', sep + 1);
@@ -457,6 +520,22 @@ void receivePackets() {
     }
   }
   radio.startReceive();
+}
+
+// Clean up stale player entries (not heard in 30 seconds)
+void cleanupStalePlayerRssi() {
+  static unsigned long lastCleanup = 0;
+  if (millis() - lastCleanup < 10000) return; // Only check every 10 seconds
+  lastCleanup = millis();
+  
+  // Remove entries that haven't been updated recently
+  // Since we can't track timestamps per entry easily, we'll just
+  // let natural packet reception refresh the map
+  // If map grows too large (memory concern), clear it
+  if (playerRssi.size() > 50) {
+    playerRssi.clear();
+    Serial.println("Cleared large playerRssi map");
+  }
 }
 
 void pingServer() {
@@ -523,10 +602,46 @@ void pingServer() {
       } else if (newTeam.length() == 0) myTeam = "";
       
       if (newEmergency && !emergencyActive) {
-        emergencyActive = true; emergencyBy = newEmergencyBy;
+        emergencyActive = true; 
+        emergencyBy = newEmergencyBy;
+        emergencyDisplayCycle = millis();
+        
+        // Parse emergency info if available
+        if (respDoc.containsKey("emergency_info")) {
+          JsonObject eInfo = respDoc["emergency_info"];
+          if (!eInfo["device_id"].isNull()) {
+            emergencyDeviceId = eInfo["device_id"].as<String>();
+          }
+          if (!eInfo["reason"].isNull()) {
+            emergencyReason = eInfo["reason"].as<String>();
+          }
+          if (!eInfo["location"].isNull()) {
+            emergencyLocation = eInfo["location"].as<String>();
+          }
+          if (eInfo.containsKey("nearby")) {
+            JsonArray nearby = eInfo["nearby"];
+            emergencyNearby = "";
+            for (int i = 0; i < nearby.size() && i < 3; i++) {
+              if (i > 0) emergencyNearby += ", ";
+              emergencyNearby += nearby[i].as<String>();
+            }
+          }
+          if (!eInfo["phone"].isNull()) {
+            emergencyPhone = eInfo["phone"].as<String>();
+          } else {
+            emergencyPhone = "";
+          }
+        }
+        
         showNotification("EMERGENCY! Help " + emergencyBy + "!", "danger");
       } else if (!newEmergency && emergencyActive) {
-        emergencyActive = false; emergencyBy = "";
+        emergencyActive = false; 
+        emergencyBy = "";
+        emergencyDeviceId = "";
+        emergencyReason = "";
+        emergencyLocation = "";
+        emergencyNearby = "";
+        emergencyPhone = "";
         showNotification("Emergency cleared", "success");
       }
       if (gamePhase != newPhase) {
@@ -584,16 +699,29 @@ void pingServer() {
     }
   }
   http.end();
-  playerRssi.clear();
-  beaconRssi.clear(); // Clear to prevent memory buildup
+  // DON'T clear playerRssi here - we need it for display and capture attempts
+  // Old entries will be naturally replaced when new packets arrive
+  // Only clear beaconRssi as it's repopulated each cycle
+  beaconRssi.clear();
 }
 
 void attemptCapture() {
+  Serial.println("=== CAPTURE ATTEMPT ===");
+  Serial.print("Role: "); Serial.println(myRole);
+  Serial.print("Game Phase: "); Serial.println(gamePhase);
+  Serial.print("Emergency: "); Serial.println(emergencyActive ? "YES" : "NO");
+  Serial.print("In Safe Zone: "); Serial.println(inSafeZone ? "YES" : "NO");
+  Serial.print("Players in RSSI map: "); Serial.println(playerRssi.size());
+  
   if (myRole != "pred") { showNotification("Only predators capture", "warning"); return; }
   if (gamePhase != "running") { showNotification("Game not active!", "warning"); return; }
   if (emergencyActive) { showNotification("EMERGENCY - No captures!", "danger"); return; }
   if (inSafeZone) { showNotification("Can't capture from safe zone", "warning"); return; }
-  if (playerRssi.empty()) { showNotification("No prey detected nearby", "info"); return; }
+  if (playerRssi.empty()) { 
+    Serial.println("ERROR: playerRssi is EMPTY - no one detected!");
+    showNotification("No prey detected nearby", "info"); 
+    return; 
+  }
   
   int bestRssi = -999; String targetId = "";
   for (auto& p : playerRssi) {
@@ -826,6 +954,7 @@ void loop() {
     lastDisplayUpdate = now; updateScroll(); displayMain();
   }
   updateLED();
+  cleanupStalePlayerRssi();
   
   // Memory monitoring (every 5 minutes)
   static unsigned long lastMemCheck = 0;

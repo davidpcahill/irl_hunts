@@ -424,6 +424,7 @@
                 <p><strong>Reason:</strong> <span id="emergency-reason">Not specified</span></p>
                 <p><strong>Time:</strong> <span id="emergency-time">--:--:--</span></p>
                 <p><strong>Last Known Location:</strong> <span id="emergency-location">Checking...</span></p>
+                <p><strong>📞 Emergency Contact:</strong> <span id="emergency-phone" style="color: #feca57; font-weight: bold;">Not provided</span></p>
                 <p><strong>Nearest Players:</strong> <span id="emergency-nearest">Calculating...</span></p>
             </div>
             <button class="btn btn-clear-emergency" onclick="clearEmergency()">✅ Clear Emergency & Resume Game</button>
@@ -532,11 +533,11 @@
                                 <th>Status</th>
                                 <th>ID</th>
                                 <th>Name</th>
+                                <th>📞</th>
                                 <th>Role</th>
                                 <th>Team</th>
                                 <th>Game Status</th>
                                 <th>Safe</th>
-                                <th>Consent</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -685,6 +686,7 @@
             document.getElementById('emergency-reason').textContent = data.reason || 'Not specified';
             document.getElementById('emergency-time').textContent = data.time || '--:--:--';
             document.getElementById('emergency-location').textContent = data.location_hint || 'Unknown';
+            document.getElementById('emergency-phone').textContent = data.phone_number || 'Not provided';
             const nearestList = data.nearest_to_emergency || [];
             document.getElementById('emergency-nearest').textContent = nearestList.length > 0 
                 ? nearestList.map(p => `${p.name} (${p.rssi}dB)`).join(', ')
@@ -702,9 +704,33 @@
             const div = document.createElement('div');
             div.className = 'event';
             if (event.type === 'emergency_triggered') div.classList.add('emergency');
+            
             let dataStr = '';
-            try { dataStr = JSON.stringify(event.data); if (dataStr.length > 100) dataStr = dataStr.substring(0, 100) + '...'; } catch (e) { dataStr = String(event.data); }
-            div.innerHTML = `<span class="event-time">${event.time_str || '--:--:--'}</span> <span class="event-type">${event.type.toUpperCase()}</span> ${dataStr}`;
+            // Special formatting for important events
+            if (event.type === 'emergency_triggered' && event.data) {
+                dataStr = `Player: ${event.data.player_name || 'Unknown'} | Device: ${event.data.device_id || '?'}`;
+                if (event.data.phone_number) {
+                    dataStr += ` | 📞 ${event.data.phone_number}`;
+                }
+                dataStr += ` | Location: ${event.data.location_hint || 'Unknown'}`;
+                if (event.data.nearest_to_emergency && event.data.nearest_to_emergency.length > 0) {
+                    const nearest = event.data.nearest_to_emergency.slice(0, 3).map(p => `${p.name}(${p.rssi}dB)`).join(', ');
+                    dataStr += ` | Nearest: ${nearest}`;
+                }
+            } else if (event.type === 'capture' && event.data) {
+                dataStr = `${event.data.pred} → ${event.data.prey} (RSSI: ${event.data.rssi}dB)`;
+            } else if (event.type === 'escape' && event.data) {
+                dataStr = `${event.data.prey} via ${event.data.beacon || 'safe zone'}`;
+            } else {
+                try { 
+                    dataStr = JSON.stringify(event.data); 
+                    if (dataStr.length > 150) dataStr = dataStr.substring(0, 150) + '...'; 
+                } catch (e) { 
+                    dataStr = String(event.data); 
+                }
+            }
+            
+            div.innerHTML = `<span class="event-time">${event.time_str || '--:--:--'}</span> <span class="event-type">${event.type.toUpperCase()}</span> ${escapeHtml(dataStr)}`;
             log.insertBefore(div, log.firstChild);
             while (log.children.length > 100) log.removeChild(log.lastChild);
         }
@@ -807,7 +833,8 @@
                     
                     const row = document.createElement('tr');
                     const teamBadge = p.team ? `<span class="team-badge">${p.team}</span>` : '';
-                    row.innerHTML = `<td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td><td>${id}</td><td>${escapeHtml(p.name)}</td><td>${p.role}</td><td>${teamBadge}</td><td><span class="status-badge status-${p.status}">${p.status}</span></td><td>${p.in_safe_zone ? '🏠' : ''}</td><td>${p.consent_physical ? '🤝' : ''}${p.consent_photo !== false ? '📸' : ''}</td><td>
+                    const phoneIcon = p.phone_number ? `<span title="${escapeHtml(p.phone_number)}" style="cursor: pointer;" onclick="alert('Phone: ${escapeHtml(p.phone_number)}')">📞</span>` : '<span style="color: #666;">-</span>';
+                    row.innerHTML = `<td><span class="online-dot ${p.online ? 'online' : 'offline'}"></span></td><td>${id}</td><td>${escapeHtml(p.name)}</td><td>${phoneIcon}</td><td>${p.role}</td><td>${teamBadge}</td><td><span class="status-badge status-${p.status}">${p.status}</span></td><td>${p.in_safe_zone ? '🏠' : ''}</td><td>
                         <button class="btn btn-small btn-primary" onclick="addMod('${id}')" title="Add moderator">+Mod</button>
                         ${p.status === 'captured' ? `<button class="btn btn-small btn-success" onclick="releasePlayer('${id}')" title="Release from capture">Free</button>` : ''}
                         <button class="btn btn-small btn-warning" onclick="forceRole('${id}', '${p.role === 'pred' ? 'prey' : 'pred'}')" title="Swap role">Swap</button>
