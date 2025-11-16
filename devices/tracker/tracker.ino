@@ -434,13 +434,6 @@ void receivePackets() {
             otherConsent = packet.substring(sep2 + 1);
           }
           
-          // Parse consent badge if present (format: ID|role|consent)
-          int sep2 = packet.indexOf('|', sep + 1);
-          String otherConsent = "STD";
-          if (sep2 > 0) {
-            otherConsent = packet.substring(sep2 + 1);
-          }
-          
           // Proximity warnings for prey
           if (!emergencyActive && myRole == "prey" && type == "pred" && !inSafeZone) {
             bool approaching = (oldRssi != -999 && (int)rssi > oldRssi + 3);
