@@ -446,7 +446,7 @@
             <div class="mode-selector">
                 <div class="current-mode-badge" id="current-mode-badge">CLASSIC HUNT</div>
                 <h3>Select Game Mode</h3>
-                <select id="game-mode" onchange="updateModeDescription()">
+                <select id="game-mode" onchange="updateModeDescription(); userEditingMode = true; clearTimeout(modeEditTimeout); modeEditTimeout = setTimeout(() => userEditingMode = false, 30000);" onfocus="userEditingMode = true;" onblur="clearTimeout(modeEditTimeout); modeEditTimeout = setTimeout(() => userEditingMode = false, 10000);">
                     <option value="classic">Classic Hunt (30 min)</option>
                     <option value="quick">Quick Match (15 min)</option>
                     <option value="endurance">Endurance (60 min)</option>
@@ -623,6 +623,8 @@
         const socket = io();
         let currentGameMode = 'classic';
         let emergencyActive = false;
+        let userEditingMode = false;
+        let modeEditTimeout = null;
         
         const modeDescriptions = {
             classic: { name: 'Classic Hunt', description: '<h4>Classic Hunt</h4><ul><li>Standard 30-minute game</li><li>Captures: 100pts | Escapes: 75pts | Photos: 25pts</li><li>Survival bonus: 200pts for never being caught</li><li>Most points wins!</li></ul>' },
@@ -753,7 +755,11 @@
                     const s = state.time_remaining % 60;
                     document.getElementById('stat-time').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
                 } else document.getElementById('stat-time').textContent = '--:--';
-                if (state.mode) { currentGameMode = state.mode; document.getElementById('game-mode').value = state.mode; updateModeDescription(); }
+                if (state.mode && !userEditingMode) { 
+                    currentGameMode = state.mode; 
+                    document.getElementById('game-mode').value = state.mode; 
+                    updateModeDescription(); 
+                }
                 if (state.emergency) { emergencyActive = true; document.getElementById('emergency-banner').classList.add('active'); document.getElementById('clear-emergency-btn').disabled = false; loadEmergencyStatus(); } else { emergencyActive = false; hideEmergencyInfo(); }
                 if (state.settings) {
                     document.getElementById('setting-honor').checked = state.settings.honor_system;
@@ -836,6 +842,8 @@
                     body: JSON.stringify({mode})
                 });
                 if (resp.ok) {
+                    userEditingMode = false; // Reset editing flag on success
+                    clearTimeout(modeEditTimeout);
                     notify(`Game mode set to: ${modeDescriptions[mode].name}`);
                     loadGameState();
                 } else {

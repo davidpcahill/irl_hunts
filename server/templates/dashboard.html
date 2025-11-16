@@ -862,7 +862,21 @@
     <script>
     const socket = io();
         const playerId = "{{ player.device_id }}";
-        let playerData = {{ player|tojson }};
+        let playerData = {};
+        try {
+            playerData = {{ player|tojson }};
+        } catch (e) {
+            console.error('Failed to parse player data:', e);
+            playerData = {
+                device_id: "{{ player.device_id }}",
+                name: "{{ player.name }}",
+                role: "{{ player.role }}",
+                status: "{{ player.status }}",
+                points: 0,
+                in_safe_zone: false,
+                consent_flags: { physical_tag: false, photo_visible: true, location_share: true }
+            };
+        }
         let isReady = false;
         
         // Initialize consent checkboxes from player data
@@ -953,7 +967,19 @@
             }
         }
         let currentGameMode = "{{ game_mode }}";
-        let modeConfig = {{ mode_config|tojson }};
+        let modeConfig = {};
+        try {
+            modeConfig = {{ mode_config|tojson }};
+        } catch (e) {
+            console.error('Failed to parse mode config:', e);
+            modeConfig = {
+                name: "Classic Hunt",
+                infection: false,
+                photo_required: false,
+                team_mode: false,
+                sighting_points: 25
+            };
+        }
         let emergencyActive = false;
         let capturedDismissed = false;
         
@@ -1777,26 +1803,59 @@
             console.error('Unhandled promise rejection:', event.reason);
         });
         
-        // Initial load
-        loadGameState();
-        loadLeaderboard();
-        loadPlayers();
-        loadMessages();
-        loadGallery();
-        updateModeDisplay();
-        loadPhotographedPrey();
-        initConsent();  // Initialize consent settings
+        // Initial load with error handling
+        async function initialLoad() {
+            try {
+                await loadGameState();
+            } catch (e) { console.error('loadGameState failed:', e); }
+            
+            try {
+                await loadLeaderboard();
+            } catch (e) { console.error('loadLeaderboard failed:', e); }
+            
+            try {
+                await loadPlayers();
+            } catch (e) { console.error('loadPlayers failed:', e); }
+            
+            try {
+                loadMessages();
+            } catch (e) { console.error('loadMessages failed:', e); }
+            
+            try {
+                loadGallery();
+            } catch (e) { console.error('loadGallery failed:', e); }
+            
+            try {
+                updateModeDisplay();
+            } catch (e) { console.error('updateModeDisplay failed:', e); }
+            
+            try {
+                loadPhotographedPrey();
+            } catch (e) { console.error('loadPhotographedPrey failed:', e); }
+            
+            try {
+                initConsent();
+            } catch (e) { console.error('initConsent failed:', e); }
+        }
+        
+        initialLoad();  // Initialize consent settings
         isReady = playerData.status === 'ready';
         updateReadyButton();
         
-        // Hide loading overlay
-        setTimeout(() => {
+        // Hide loading overlay (with fallback)
+        function hideLoadingOverlay() {
             const overlay = document.getElementById('loading-overlay');
             if (overlay) {
                 overlay.style.opacity = '0';
                 setTimeout(() => overlay.remove(), 500);
             }
-        }, 500);
+        }
+        
+        // Hide after initial load
+        setTimeout(hideLoadingOverlay, 1000);
+        
+        // Fallback: force hide after 5 seconds no matter what
+        setTimeout(hideLoadingOverlay, 5000);
         
         // Periodic updates
         setInterval(loadGameState, 3000);
@@ -1842,6 +1901,17 @@
                     }
                     break;
             }
+        });
+
+        // Global error handler - ensures loading screen goes away
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.message, e.filename, e.lineno);
+            hideLoadingOverlay();
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
+            hideLoadingOverlay();
         });
     </script>
 </body>

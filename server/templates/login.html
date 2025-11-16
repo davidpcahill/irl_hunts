@@ -377,6 +377,24 @@
                 showError('Connection error');
             }
         }
+
+        // Check server connectivity on load
+        async function checkServer() {
+            try {
+                const resp = await fetch('/api/game', { method: 'GET', timeout: 5000 });
+                if (resp.ok) {
+                    console.log('✅ Server connection OK');
+                } else {
+                    console.warn('⚠️ Server responded but with error:', resp.status);
+                }
+            } catch (err) {
+                console.error('❌ Cannot reach server:', err);
+                showError('Cannot connect to server. Is it running?');
+            }
+        }
+        
+        // Check on page load
+        checkServer();
     </script>
 </body>
 </html>
