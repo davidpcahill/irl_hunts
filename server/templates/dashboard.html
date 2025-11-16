@@ -651,6 +651,13 @@
                     <span class="stat-label">Safe Zone</span>
                     <span class="stat-value" id="your-safezone">{{ 'YES' if player.in_safe_zone else 'NO' }}</span>
                 </div>
+                <div class="stat-row">
+                    <span class="stat-label">Nearby Threats</span>
+                    <span class="stat-value" id="your-nearby">
+                        <span id="nearby-count">0</span> 
+                        <span id="nearby-indicator" style="font-size: 10px; color: #888;">checking...</span>
+                    </span>
+                </div>
                 <div class="stat-row" id="team-row" style="display: none;">
                     <span class="stat-label">Team</span>
                     <span class="stat-value" id="your-team">-</span>

@@ -20,6 +20,7 @@ from flask_socketio import SocketIO, emit, join_room
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from functools import wraps
+from collections import defaultdict
 import secrets
 import time
 import threading
@@ -27,6 +28,7 @@ import os
 import uuid
 import random
 import sys
+import hashlib
 
 # =============================================================================
 # LOAD CONFIGURATION
@@ -238,6 +240,37 @@ team_scores = {"Alpha": 0, "Beta": 0, "Gamma": 0, "Delta": 0}
 event_counter = 0
 background_thread_stop = False
 
+# Rate limiting
+login_attempts = defaultdict(list)  # IP -> list of timestamps
+failed_admin_logins = defaultdict(int)  # IP -> count
+RATE_LIMIT_WINDOW = 60  # seconds
+MAX_LOGIN_ATTEMPTS = 10  # per window
+MAX_ADMIN_FAILURES = 5  # before temporary lockout
+admin_lockout_until = {}  # IP -> unlock timestamp
+
+# Game statistics (persistent across resets)
+game_stats = {
+    "total_games_played": 0,
+    "total_captures_all_time": 0,
+    "total_escapes_all_time": 0,
+    "longest_game_minutes": 0,
+    "most_players_in_game": 0,
+    "server_start_time": time.time()
+}
+
+# Achievements tracking
+ACHIEVEMENTS = {
+    "first_blood": {"name": "First Blood", "desc": "First capture of the game", "icon": "🩸"},
+    "survivor": {"name": "Survivor", "desc": "Never captured in a game", "icon": "🛡️"},
+    "escape_artist": {"name": "Escape Artist", "desc": "Escape 3+ times in one game", "icon": "🏃"},
+    "hunter_elite": {"name": "Elite Hunter", "desc": "Capture 5+ prey in one game", "icon": "🎯"},
+    "paparazzi": {"name": "Paparazzi", "desc": "10+ photo sightings in one game", "icon": "📸"},
+    "team_player": {"name": "Team Player", "desc": "Win a team competition", "icon": "🤝"},
+    "last_standing": {"name": "Last Standing", "desc": "Last survivor in infection mode", "icon": "👑"},
+    "marathon": {"name": "Marathon", "desc": "Play in an endurance game (60+ min)", "icon": "🏅"},
+}
+player_achievements = {}  # device_id -> set of achievement keys
+
 # =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
@@ -248,6 +281,77 @@ def now():
 def now_str():
     return datetime.now().strftime("%H:%M:%S")
 
+def check_rate_limit(ip_address, limit_type="login"):
+    """Check if IP is rate limited"""
+    current_time = time.time()
+    
+    if limit_type == "login":
+        # Clean old attempts
+        login_attempts[ip_address] = [
+            t for t in login_attempts[ip_address] 
+            if current_time - t < RATE_LIMIT_WINDOW
+        ]
+        
+        if len(login_attempts[ip_address]) >= MAX_LOGIN_ATTEMPTS:
+            return False, f"Too many login attempts. Wait {RATE_LIMIT_WINDOW} seconds."
+        
+        login_attempts[ip_address].append(current_time)
+        return True, "OK"
+    
+    elif limit_type == "admin":
+        if ip_address in admin_lockout_until:
+            if current_time < admin_lockout_until[ip_address]:
+                remaining = int(admin_lockout_until[ip_address] - current_time)
+                return False, f"Admin login locked. Try again in {remaining} seconds."
+            else:
+                del admin_lockout_until[ip_address]
+                failed_admin_logins[ip_address] = 0
+        
+        if failed_admin_logins[ip_address] >= MAX_ADMIN_FAILURES:
+            admin_lockout_until[ip_address] = current_time + 300  # 5 minute lockout
+            return False, "Too many failed attempts. Locked for 5 minutes."
+        
+        return True, "OK"
+    
+    return True, "OK"
+
+def award_achievement(device_id, achievement_key):
+    """Award an achievement to a player"""
+    if device_id not in player_achievements:
+        player_achievements[device_id] = set()
+    
+    if achievement_key not in player_achievements[device_id]:
+        player_achievements[device_id].add(achievement_key)
+        achievement = ACHIEVEMENTS.get(achievement_key, {})
+        if device_id in players:
+            notify_player(device_id, 
+                f"{achievement.get('icon', '🏆')} Achievement Unlocked: {achievement.get('name', achievement_key)}!", 
+                "success")
+        log_event("achievement", {
+            "player": players.get(device_id, {}).get("name", device_id),
+            "achievement": achievement_key,
+            "name": achievement.get("name", achievement_key)
+        })
+        return True
+    return False
+
+def check_achievements(device_id):
+    """Check and award any earned achievements for a player"""
+    player = players.get(device_id)
+    if not player:
+        return
+    
+    # Escape Artist: 3+ escapes
+    if player["escapes"] >= 3:
+        award_achievement(device_id, "escape_artist")
+    
+    # Elite Hunter: 5+ captures
+    if player["captures"] >= 5:
+        award_achievement(device_id, "hunter_elite")
+    
+    # Paparazzi: 10+ sightings
+    if player["sightings"] >= 10:
+        award_achievement(device_id, "paparazzi")
 
 def validate_game_action(required_phase=None, block_on_emergency=True):
     """Helper to validate common game action preconditions"""
@@ -526,6 +630,15 @@ def process_capture(pred_id, prey_id, rssi):
         notify_all_players(f"💰 {pred['name']} collected the bounty on {prey_p['name']}!", "info")
         del bounties[prey_id]
     
+    # Check for first blood achievement
+    total_captures = sum(p["captures"] for p in players.values())
+    if total_captures == 1:
+        award_achievement(pred_id, "first_blood")
+        notify_all_players(f"🩸 {pred['name']} drew FIRST BLOOD!", "warning")
+    
+    # Check other achievements
+    check_achievements(pred_id)
+    
     return True, f"Captured {prey_p['name']}!"
 
 def process_escape(prey_id, beacon_id=None):
@@ -554,6 +667,9 @@ def process_escape(prey_id, beacon_id=None):
     # Notify the predator who lost their prey
     if escaped_from_device and escaped_from_device in players:
         notify_player(escaped_from_device, f"⚠️ {prey_p['name']} ESCAPED! Hunt them again!", "warning")
+    
+    # Check achievements
+    check_achievements(prey_id)
     
     socketio.emit("escape", {"prey": prey_p["name"], "from": escaped_from}, room="all")
     return True
@@ -778,12 +894,23 @@ def uploaded_file(filename):
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
+    # Rate limiting
+    client_ip = request.remote_addr or "unknown"
+    allowed, msg = check_rate_limit(client_ip, "login")
+    if not allowed:
+        log_event("rate_limit", {"ip": client_ip, "type": "login"}, broadcast=False)
+        return jsonify({"error": msg}), 429
+    
     data = request.json or {}
     device_id = data.get("device_id", "").strip().upper()
+    
+    # Input validation
     if not device_id or len(device_id) < 4:
         return jsonify({"error": "Invalid device ID"}), 400
     if len(device_id) > 10:
         return jsonify({"error": "Device ID too long"}), 400
+    if not device_id.replace("_", "").isalnum():
+        return jsonify({"error": "Device ID must be alphanumeric"}), 400
     
     # Generate unique session token to identify this specific browser tab
     session_token = secrets.token_hex(16)
@@ -810,14 +937,34 @@ def api_login():
 
 @app.route("/api/admin_login", methods=["POST"])
 def api_admin_login():
+    client_ip = request.remote_addr or "unknown"
+    
+    # Check rate limit
+    allowed, msg = check_rate_limit(client_ip, "admin")
+    if not allowed:
+        log_event("admin_lockout", {"ip": client_ip}, broadcast=False)
+        return jsonify({"error": msg}), 429
+    
     data = request.json or {}
     if data.get("password") == ADMIN_PASSWORD:
+        # Reset failure count on success
+        failed_admin_logins[client_ip] = 0
         session["is_admin"] = True
         session["device_id"] = "ADMIN"
         session.permanent = True
-        log_event("admin_login", {})
+        log_event("admin_login", {"ip": client_ip})
         return jsonify({"success": True})
-    return jsonify({"error": "Invalid password"}), 401
+    
+    # Track failed attempt
+    failed_admin_logins[client_ip] += 1
+    remaining = MAX_ADMIN_FAILURES - failed_admin_logins[client_ip]
+    log_event("admin_login_failed", {"ip": client_ip, "attempts_remaining": remaining}, broadcast=False)
+    
+    if remaining <= 0:
+        admin_lockout_until[client_ip] = time.time() + 300
+        return jsonify({"error": "Too many failed attempts. Locked for 5 minutes."}), 429
+    
+    return jsonify({"error": f"Invalid password. {remaining} attempts remaining."}), 401
 
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
@@ -1585,11 +1732,148 @@ def api_resume_game():
 def api_end_game():
     game["phase"] = "ended"
     game["end_time"] = now()
+    
+    # Update global stats
+    game_stats["total_games_played"] += 1
+    game_stats["total_captures_all_time"] += sum(p["captures"] for p in players.values())
+    game_stats["total_escapes_all_time"] += sum(p["escapes"] for p in players.values())
+    
+    if game["duration"] > game_stats["longest_game_minutes"]:
+        game_stats["longest_game_minutes"] = game["duration"]
+    
+    current_players = len([p for p in players.values() if p["role"] != "unassigned"])
+    if current_players > game_stats["most_players_in_game"]:
+        game_stats["most_players_in_game"] = current_players
+    
+    # Award end-game achievements
+    mode_config = get_mode_config()
+    
+    for device_id, player in players.items():
+        # Survivor achievement (prey never caught)
+        if player["role"] == "prey" and player["times_captured"] == 0:
+            award_achievement(device_id, "survivor")
+        
+        # Marathon achievement (endurance mode)
+        if game["duration"] >= 60:
+            award_achievement(device_id, "marathon")
+        
+        # Team player (winning team)
+        if mode_config["team_mode"] and player.get("team"):
+            winning_team = max(team_scores, key=team_scores.get) if team_scores else None
+            if winning_team and player["team"] == winning_team and team_scores[winning_team] > 0:
+                award_achievement(device_id, "team_player")
+        
+        # Last standing (infection mode)
+        if mode_config["infection"] and player["role"] == "prey":
+            prey_count = len([p for p in players.values() if p["role"] == "prey"])
+            if prey_count == 1:
+                award_achievement(device_id, "last_standing")
+    
     lb = get_leaderboard()
-    log_event("game_end", {"leaderboard": lb})
+    log_event("game_end", {
+        "leaderboard": lb,
+        "duration": game["duration"],
+        "mode": game["mode"],
+        "total_captures": sum(p["captures"] for p in players.values()),
+        "total_escapes": sum(p["escapes"] for p in players.values())
+    })
     notify_all_players("GAME OVER!", "info")
     socketio.emit("game_ended", lb, room="all")
     return jsonify({"success": True, "leaderboard": lb})
+
+@app.route("/api/game/presets", methods=["GET"])
+def api_get_presets():
+    """Get predefined game setup presets"""
+    presets = {
+        "quick_demo": {
+            "name": "Quick Demo",
+            "description": "5-minute demo for testing",
+            "mode": "quick",
+            "duration": 5,
+            "capture_rssi": -75,
+            "honor_system": False
+        },
+        "casual_hunt": {
+            "name": "Casual Hunt",
+            "description": "Relaxed 20-minute game",
+            "mode": "classic",
+            "duration": 20,
+            "capture_rssi": -70,
+            "honor_system": False
+        },
+        "competitive": {
+            "name": "Competitive Match",
+            "description": "Standard 30-minute competitive game",
+            "mode": "classic",
+            "duration": 30,
+            "capture_rssi": -65,
+            "honor_system": False
+        },
+        "infection_outbreak": {
+            "name": "Infection Outbreak",
+            "description": "Infection mode - last survivor wins!",
+            "mode": "infection",
+            "duration": 25,
+            "capture_rssi": -70,
+            "honor_system": False
+        },
+        "photo_safari": {
+            "name": "Photo Safari",
+            "description": "Must photograph before capture",
+            "mode": "photo_safari",
+            "duration": 30,
+            "capture_rssi": -70,
+            "honor_system": False
+        },
+        "team_battle": {
+            "name": "Team Battle",
+            "description": "Team competition - coordinate to win",
+            "mode": "team",
+            "duration": 30,
+            "capture_rssi": -70,
+            "honor_system": False
+        },
+        "endurance_challenge": {
+            "name": "Endurance Challenge",
+            "description": "60-minute marathon",
+            "mode": "endurance",
+            "duration": 60,
+            "capture_rssi": -70,
+            "honor_system": False
+        }
+    }
+    return jsonify(presets)
+
+@app.route("/api/game/preset/<preset_name>", methods=["POST"])
+@admin_required
+def api_apply_preset(preset_name):
+    """Apply a game preset"""
+    if game["phase"] != "lobby":
+        return jsonify({"error": "Can only apply presets in lobby"}), 400
+    
+    presets = {
+        "quick_demo": {"mode": "quick", "duration": 5, "capture_rssi": -75},
+        "casual_hunt": {"mode": "classic", "duration": 20, "capture_rssi": -70},
+        "competitive": {"mode": "classic", "duration": 30, "capture_rssi": -65},
+        "infection_outbreak": {"mode": "infection", "duration": 25, "capture_rssi": -70},
+        "photo_safari": {"mode": "photo_safari", "duration": 30, "capture_rssi": -70},
+        "team_battle": {"mode": "team", "duration": 30, "capture_rssi": -70},
+        "endurance_challenge": {"mode": "endurance", "duration": 60, "capture_rssi": -70},
+    }
+    
+    if preset_name not in presets:
+        return jsonify({"error": "Unknown preset"}), 404
+    
+    preset = presets[preset_name]
+    game["mode"] = preset["mode"]
+    game["duration"] = preset["duration"]
+    game["settings"]["capture_rssi"] = preset["capture_rssi"]
+    
+    log_event("preset_applied", {"preset": preset_name, "mode": preset["mode"]})
+    notify_all_players(f"Game preset applied: {preset_name.replace('_', ' ').title()}", "info")
+    socketio.emit("mode_change", {"mode": game["mode"], "config": GAME_MODES[game["mode"]]}, room="all")
+    
+    return jsonify({"success": True, "preset": preset_name, "settings": preset})
 
 @app.route("/api/game/reset", methods=["POST"])
 @admin_required
@@ -1980,6 +2264,92 @@ def api_kick_player():
         notify_all_players(f"{name} was removed from the game", "info")
     return jsonify({"success": True})
 
+# Player reports tracking
+player_reports = []  # List of report dicts
+
+@app.route("/api/report", methods=["POST"])
+@login_required
+def api_report_player():
+    """Report a player for inappropriate behavior"""
+    device_id = session["device_id"]
+    if device_id == "ADMIN":
+        return jsonify({"error": "Admin cannot report"}), 400
+    
+    data = request.json or {}
+    target_id = data.get("target_id", "").strip().upper()
+    reason = str(data.get("reason", ""))[:500].strip()
+    category = data.get("category", "other")
+    
+    if not target_id or target_id not in players:
+        return jsonify({"error": "Invalid target player"}), 400
+    
+    if not reason:
+        return jsonify({"error": "Please provide a reason"}), 400
+    
+    if target_id == device_id:
+        return jsonify({"error": "Cannot report yourself"}), 400
+    
+    valid_categories = ["harassment", "cheating", "unsafe_behavior", "consent_violation", "other"]
+    if category not in valid_categories:
+        category = "other"
+    
+    reporter = players.get(device_id, {})
+    target = players.get(target_id, {})
+    
+    report = {
+        "id": len(player_reports) + 1,
+        "reporter_id": device_id,
+        "reporter_name": reporter.get("name", "Unknown"),
+        "target_id": target_id,
+        "target_name": target.get("name", "Unknown"),
+        "category": category,
+        "reason": reason,
+        "timestamp": now(),
+        "time_str": now_str(),
+        "reviewed": False,
+        "action_taken": None
+    }
+    
+    player_reports.append(report)
+    
+    # Alert moderators
+    log_event("player_report", {
+        "reporter": reporter.get("name", device_id),
+        "target": target.get("name", target_id),
+        "category": category,
+        "reason": reason[:100] + "..." if len(reason) > 100 else reason
+    })
+    
+    # Notify all moderators
+    for mod_id in moderators:
+        notify_player(mod_id, f"⚠️ New report: {target.get('name', target_id)} - {category}", "warning")
+    
+    return jsonify({"success": True, "report_id": report["id"]})
+
+@app.route("/api/reports", methods=["GET"])
+@mod_required
+def api_get_reports():
+    """Get all player reports (mod/admin only)"""
+    return jsonify(player_reports)
+
+@app.route("/api/reports/<int:report_id>/review", methods=["POST"])
+@mod_required
+def api_review_report(report_id):
+    """Mark a report as reviewed"""
+    data = request.json or {}
+    action = data.get("action", "noted")
+    
+    for report in player_reports:
+        if report["id"] == report_id:
+            report["reviewed"] = True
+            report["action_taken"] = action
+            report["reviewed_by"] = session.get("device_id", "ADMIN")
+            report["reviewed_at"] = now_str()
+            log_event("report_reviewed", {"report_id": report_id, "action": action})
+            return jsonify({"success": True})
+    
+    return jsonify({"error": "Report not found"}), 404
+
 
 # =============================================================================
 # CONSENT API
@@ -2026,6 +2396,37 @@ def api_update_consent():
     socketio.emit("player_update", player, room="all")
     
     return jsonify({"success": True, "consent_flags": player["consent_flags"]})
+
+@app.route("/api/achievements", methods=["GET"])
+def api_get_achievements():
+    """Get all available achievements"""
+    return jsonify(ACHIEVEMENTS)
+
+@app.route("/api/player/achievements", methods=["GET"])
+@login_required
+def api_get_player_achievements():
+    """Get current player's achievements"""
+    device_id = session["device_id"]
+    if device_id == "ADMIN":
+        return jsonify([])
+    
+    earned = player_achievements.get(device_id, set())
+    result = []
+    for key in earned:
+        if key in ACHIEVEMENTS:
+            ach = ACHIEVEMENTS[key].copy()
+            ach["key"] = key
+            result.append(ach)
+    
+    return jsonify(result)
+
+@app.route("/api/stats/global", methods=["GET"])
+def api_get_global_stats():
+    """Get global game statistics"""
+    stats = game_stats.copy()
+    stats["uptime_hours"] = (time.time() - stats["server_start_time"]) / 3600
+    stats["total_achievements_earned"] = sum(len(achs) for achs in player_achievements.values())
+    return jsonify(stats)
 
 @app.route("/api/players/consent_summary", methods=["GET"])
 def api_consent_summary():
@@ -2159,6 +2560,70 @@ server_start_time = time.time()
 # MAIN
 # =============================================================================
 
+def save_game_state():
+    """Save current game state to file for recovery"""
+    state = {
+        "game": game,
+        "players": {k: {key: val for key, val in v.items() if key != "notifications"} 
+                    for k, v in players.items()},
+        "beacons": beacons,
+        "game_stats": game_stats,
+        "player_achievements": {k: list(v) for k, v in player_achievements.items()},
+        "timestamp": now()
+    }
+    try:
+        with open("game_state_backup.json", "w") as f:
+            json.dump(state, f, indent=2, default=str)
+        print(f"[{now_str()}] Game state saved")
+    except Exception as e:
+        print(f"[{now_str()}] Failed to save game state: {e}")
+
+def load_game_state():
+    """Load game state from backup file"""
+    global game_stats, player_achievements
+    try:
+        if os.path.exists("game_state_backup.json"):
+            with open("game_state_backup.json", "r") as f:
+                state = json.load(f)
+            
+            # Only restore persistent stats, not active game
+            if "game_stats" in state:
+                game_stats.update(state["game_stats"])
+                game_stats["server_start_time"] = time.time()
+            
+            if "player_achievements" in state:
+                for k, v in state["player_achievements"].items():
+                    player_achievements[k] = set(v)
+            
+            print(f"[{now_str()}] Restored persistent stats from backup")
+            return True
+    except Exception as e:
+        print(f"[{now_str()}] Could not load backup: {e}")
+    return False
+
+def graceful_shutdown(signum=None, frame=None):
+    """Handle graceful shutdown"""
+    global background_thread_stop
+    print(f"\n[{now_str()}] Shutting down gracefully...")
+    
+    background_thread_stop = True
+    save_game_state()
+    
+    # Notify all connected clients
+    try:
+        notify_all_players("Server is shutting down. Thanks for playing!", "warning")
+        socketio.emit("server_shutdown", {}, room="all")
+    except:
+        pass
+    
+    print(f"[{now_str()}] Shutdown complete")
+    sys.exit(0)
+
+# Register signal handlers
+import signal
+signal.signal(signal.SIGINT, graceful_shutdown)
+signal.signal(signal.SIGTERM, graceful_shutdown)
+
 if __name__ == "__main__":
     # Get config values with defaults
     host = HOST if 'HOST' in dir() else "0.0.0.0"
@@ -2167,8 +2632,8 @@ if __name__ == "__main__":
     unsafe_werkzeug = ALLOW_UNSAFE_WERKZEUG if 'ALLOW_UNSAFE_WERKZEUG' in dir() else True
     
     print("=" * 60)
-    print("  🎯 IRL Hunts Game Server v4")
-    print("  Complete Game Modes + Emergency System")
+    print("  🎯 IRL Hunts Game Server v4.1")
+    print("  Complete Game Modes + Emergency System + Achievements")
     print("=" * 60)
     print(f"  Admin Password: {'*' * len(ADMIN_PASSWORD)} (hidden)")
     print(f"  Server URL: http://{host}:{port}")
@@ -2180,5 +2645,12 @@ if __name__ == "__main__":
     print("  Change settings by editing config files, not source code!")
     print("=" * 60)
     
+    # Load any saved persistent data
+    load_game_state()
+    
     start_background_thread()
-    socketio.run(app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=unsafe_werkzeug)
+    
+    try:
+        socketio.run(app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=unsafe_werkzeug)
+    except KeyboardInterrupt:
+        graceful_shutdown()

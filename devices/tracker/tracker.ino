@@ -1003,26 +1003,69 @@ unsigned long lastWifiCheck = 0, lastSuccessfulPing = 0;
 int consecutivePingFails = 0;
 
 void checkWiFiConnection() {
+  static int reconnectAttempts = 0;
+  static unsigned long lastReconnectAttempt = 0;
+  
   bool wasConnected = wifiConnected;
   wifiConnected = (WiFi.status() == WL_CONNECTED);
   
   if (!wifiConnected && wasConnected) {
     showNotification("WiFi lost! Reconnecting...", "danger");
+    reconnectAttempts = 0;
   } else if (wifiConnected && !wasConnected) {
     showNotification("WiFi reconnected!", "success");
     consecutivePingFails = 0;
+    reconnectAttempts = 0;
   }
   
   if (!wifiConnected && (millis() - lastWifiCheck > WIFI_RECONNECT_INTERVAL)) {
     lastWifiCheck = millis();
+    reconnectAttempts++;
+    
+    Serial.println("WiFi reconnect attempt #" + String(reconnectAttempts));
+    
+    // Progressive backoff for reconnection attempts
+    unsigned long backoffDelay = min(reconnectAttempts * 1000, 10000UL);
+    
+    if (millis() - lastReconnectAttempt < backoffDelay) {
+      return;  // Wait before next attempt
+    }
+    lastReconnectAttempt = millis();
+    
+    // Full WiFi reset every 5 attempts
+    if (reconnectAttempts % 5 == 0) {
+      Serial.println("Full WiFi reset...");
+      WiFi.mode(WIFI_OFF);
+      delay(500);
+      WiFi.mode(WIFI_STA);
+      delay(100);
+    }
+    
     WiFi.disconnect();
     delay(100);
     WiFi.begin(wifi_ssid, wifi_pass);
     
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
-      delay(500);
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+      delay(250);
       attempts++;
+      
+      // Don't block too long - let other tasks run
+      if (attempts % 4 == 0) {
+        updateLED();
+        handleButton();
+      }
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("WiFi reconnected! IP: " + WiFi.localIP().toString());
+    } else {
+      Serial.println("WiFi reconnect failed");
+      
+      // After many failures, show persistent warning
+      if (reconnectAttempts >= 10) {
+        showNotification("WiFi issues! Check network or restart tracker", "danger");
+      }
     }
   }
 }
