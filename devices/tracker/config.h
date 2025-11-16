@@ -16,14 +16,14 @@
 // WIFI SETTINGS - EDIT THESE!
 // =============================================================================
 
-#define WIFI_SSID "furbidden"
-#define WIFI_PASS "!b4rka11day4now-"
+#define WIFI_SSID "YourWiFiName"
+#define WIFI_PASS "YourWiFiPassword"
 
 // =============================================================================
 // SERVER SETTINGS - EDIT THIS!
 // =============================================================================
 
-#define SERVER_URL "http://192.168.11.49:5000"
+#define SERVER_URL "http://YOUR_SERVER_IP:5000"
 
 // =============================================================================
 // LORA SETTINGS
