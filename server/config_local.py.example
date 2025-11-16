@@ -1,23 +1,53 @@
 #!/usr/bin/env python3
 """
-Local configuration overrides
+IRL Hunts Server - Local Configuration Overrides
 
-Copy from config.py and customize for your environment.
-This file should NOT be committed to version control!
+SETUP:
+1. Copy this file to config_local.py (remove .example)
+2. Edit ONLY the settings you need to change
+3. The server will use these values, falling back to config.py for anything not set
+
+SECURITY: This file contains credentials - do NOT commit to git!
 """
 
-# Override security settings
-ADMIN_PASSWORD = "your_secure_password_here"
-SECRET_KEY = "your_random_secret_key_here"
+# =============================================================================
+# REQUIRED - You MUST change these!
+# =============================================================================
 
-# Production settings
+# Admin panel password (make it strong!)
+ADMIN_PASSWORD = "your_secure_password_here"
+
+# Flask session secret (generate with: python -c "import secrets; print(secrets.token_hex(32))")
+SECRET_KEY = "paste_your_random_string_here"
+
+# =============================================================================
+# RECOMMENDED FOR PRODUCTION
+# =============================================================================
+
+# Disable debug mode for production
 DEBUG = False
 ALLOW_UNSAFE_WERKZEUG = False
 
-# Optional: Custom game settings
-# DEFAULT_CAPTURE_RSSI = -65  # Stricter capture requirement
-# MAX_PLAYERS = 50  # Limit players
+# =============================================================================
+# OPTIONAL OVERRIDES - Uncomment to change defaults
+# =============================================================================
 
-# Optional: Logging
-# LOG_FILE = "game.log"
-# LOG_LEVEL = "INFO"
+# Server binding
+# HOST = "0.0.0.0"  # Listen on all interfaces (default)
+# PORT = 5000       # Server port (default)
+
+# Game balance
+# DEFAULT_CAPTURE_RSSI = -65  # Stricter: must be closer to capture
+# DEFAULT_SAFEZONE_RSSI = -80 # Larger safe zones
+
+# Performance tuning
+# MAX_PLAYERS = 50            # Limit players for smaller events
+# PLAYER_TIMEOUT = 60         # Longer timeout for spotty WiFi
+
+# Scoring customization
+# SIGHTING_POINTS = 50        # Higher photo rewards
+# SIGHTING_COOLDOWN = 60      # Longer cooldown between photos
+
+# Logging
+# LOG_FILE = "game.log"       # Log to file instead of console
+# LOG_LEVEL = "DEBUG"         # More verbose logging

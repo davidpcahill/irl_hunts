@@ -50,14 +50,15 @@ IRL Hunts is an outdoor game system that brings the thrill of digital gaming int
 irlhunts/
 ├── README.md                    # This file
 ├── LICENSE                      # MIT License
-├── .gitignore                   # Git ignore rules
-├── TEST.md                      # Testing procedures
+├── .gitignore                   # Git ignore rules (keeps credentials safe)
 ├── server/                      # Web server application
 │   ├── app.py                   # Main Flask server
-│   ├── config.py                # Default configuration
-│   ├── config_local.py.example  # Local config template
+│   ├── config.py                # Default configuration (documented)
+│   ├── config_local.py.example  # Template for your local overrides
+│   ├── config_local.py          # YOUR settings (gitignored, you create this)
 │   ├── requirements.txt         # Python dependencies
-│   ├── uploads/                 # User-uploaded photos (gitignored contents)
+│   ├── uploads/                 # User-uploaded photos (contents gitignored)
+│   │   └── .gitkeep             # Keeps folder in git
 │   └── templates/               # Web interface
 │       ├── login.html           # Player/admin login
 │       ├── dashboard.html       # Player game interface
@@ -65,19 +66,31 @@ irlhunts/
 ├── devices/                     # Arduino device code
 │   ├── tracker/                 # Player tracker
 │   │   ├── tracker.ino          # Main tracker firmware
-│   │   ├── config.h             # Default device config
-│   │   └── config_local.h.example  # Local config template
+│   │   ├── config.h             # Default device settings (documented)
+│   │   ├── config_local.h.example  # Template for your WiFi/server settings
+│   │   └── config_local.h       # YOUR settings (gitignored, you create this)
 │   └── beacon/                  # Safe zone beacon
 │       ├── beacon.ino           # Beacon firmware
-│       ├── config.h             # Default device config
-│       └── config_local.h.example  # Local config template
-└── docs/                        # Documentation
-    ├── SETUP.md                 # Detailed setup guide
-    ├── GAMEPLAY.md              # Game rules and strategies
-    ├── HARDWARE.md              # Hardware requirements
-    ├── CONFIG.md                # Configuration guide
-    └── TEST.md                  # Testing procedures (duplicate)
+│       ├── config.h             # Default device settings (documented)
+│       ├── config_local.h.example  # Template for your settings
+│       └── config_local.h       # YOUR settings (gitignored, you create this)
+├── docs/                        # Documentation
+│   ├── SETUP.md                 # Detailed setup guide
+│   ├── GAMEPLAY.md              # Game rules and strategies
+│   ├── HARDWARE.md              # Hardware requirements
+│   ├── CONFIG.md                # Configuration options reference
+│   ├── CONFIG_SYSTEM.md         # How the config system works
+│   └── TEST.md                  # Testing procedures
+└── patches/                     # Maintenance scripts
+    ├── patch_gitignore.py       # Ensures credentials are gitignored
+    └── irlhunts_patch.py        # Fixes config issues and bugs
 ```
+
+
+**Configuration Philosophy:** You only need to set what's different from defaults! 
+- `config.h` / `config.py` = All defaults with documentation (don't edit)
+- `config_local.h` / `config_local.py` = Your overrides only (credentials, WiFi, etc.)
+- See `docs/CONFIG_SYSTEM.md` for detailed explanation
 
 **Note:** Files ending in `.example` are templates. Copy them to create your local config files (without `.example`). Local config files contain credentials and are gitignored.
 

@@ -133,9 +133,6 @@ bool consentPhysical = false;
 bool consentPhoto = true;
 String consentBadge = "";  // Visual badge for LoRa broadcasts
 bool wifiConnected = false, serverReachable = false;
-String consentBadge = "STD";  // Consent flags badge (STD=standard, T=touch OK, NP=no photo, NL=no location)
-bool myReady = false;
-String consentBadge = "STD";  // Consent flags badge (STD=standard, T=touch OK, NP=no photo, NL=no location)
 bool myReady = false;
 unsigned long lastWifiCheck = 0, lastSuccessfulPing = 0;
 int consecutivePingFails = 0;

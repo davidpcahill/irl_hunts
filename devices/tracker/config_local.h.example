@@ -1,25 +1,67 @@
 /*
- * Local Configuration - EDIT THIS FILE!
+ * IRL Hunts - Local Configuration Overrides
  * 
- * Copy this to config_local.h and fill in your actual values.
- * This file should NOT be committed to git!
+ * SETUP:
+ * 1. Copy this file to config_local.h (remove .example)
+ * 2. Edit ONLY the settings you need to change
+ * 3. The .ino file will use these values, falling back to defaults for anything not set
+ * 
+ * HOW IT WORKS:
+ * - If config_local.h exists, it's included instead of config.h
+ * - The .ino file has hardcoded fallbacks for most settings
+ * - You MUST define: WIFI_SSID, WIFI_PASS, SERVER_URL
+ * - Everything else is optional (has defaults)
+ * 
+ * SECURITY: This file contains credentials - do NOT commit to git!
  */
 
 #ifndef CONFIG_LOCAL_H
 #define CONFIG_LOCAL_H
 
-// Your WiFi credentials
-#define WIFI_SSID "MyHomeWifi"
-#define WIFI_PASS "MySecurePassword123"
+// =============================================================================
+// REQUIRED SETTINGS - You MUST set these!
+// =============================================================================
 
-// Your server IP (find with ipconfig or ifconfig)
-#define SERVER_URL "http://192.168.1.100:5000"
+// Your WiFi network name (case-sensitive)
+#define WIFI_SSID "YourWiFiName"
 
-// Your region's LoRa frequency
-#define LORA_FREQUENCY 915.0  // Americas
+// Your WiFi password
+#define WIFI_PASS "YourWiFiPassword"
 
-// Optional: Custom device ID
+// Server IP address (find with: ipconfig on Windows, ifconfig on Mac/Linux)
+// Example: http://192.168.1.100:5000
+#define SERVER_URL "http://YOUR_SERVER_IP:5000"
+
+// =============================================================================
+// OPTIONAL SETTINGS - Uncomment to override defaults
+// =============================================================================
+
+// LoRa frequency for your region:
+// - Americas: 915.0 (default)
+// - Europe: 868.0  
+// - Asia: 433.0
+// #define LORA_FREQUENCY 915.0
+
+// Custom device ID (instead of auto-generated from MAC address)
 // #define USE_CUSTOM_ID 1
-// #define CUSTOM_DEVICE_ID "TRACKER1"
+// #define CUSTOM_DEVICE_ID "HUNTER01"
+
+// Timing adjustments (milliseconds)
+// #define PING_INTERVAL 5000           // How often to contact server
+// #define BEACON_INTERVAL 3000         // How often to broadcast presence
+// #define WIFI_RECONNECT_INTERVAL 15000 // Time between WiFi reconnect attempts
+
+// Emergency trigger settings
+// #define EMERGENCY_HOLD_TIME 2000     // Hold button this long (ms)
+// #define EMERGENCY_TAP_COUNT 3        // Then tap this many times
+// #define EMERGENCY_TAP_WINDOW 2000    // Within this time window (ms)
+
+// Display settings
+// #define DISPLAY_UPDATE_INTERVAL 100  // OLED refresh rate (ms)
+// #define SCROLL_SPEED 150             // Text scroll speed (ms)
+// #define NOTIFICATION_DURATION 3000   // How long notifications show (ms)
+
+// Server timeout warning
+// #define SERVER_TIMEOUT_THRESHOLD 45000 // Warn after this long without response (ms)
 
 #endif // CONFIG_LOCAL_H

@@ -1,25 +1,41 @@
 /*
- * Local Configuration - EDIT THIS FILE!
+ * IRL Hunts - Safe Zone Beacon Local Configuration
  * 
- * Copy this to config_local.h and fill in your actual values.
- * This file should NOT be committed to git!
+ * SETUP:
+ * 1. Copy this file to config_local.h (remove .example)
+ * 2. Edit ONLY the settings you need to change
+ * 
+ * NOTE: Beacons don't need WiFi or server settings!
+ * They just broadcast their presence via LoRa.
+ * 
+ * SECURITY: This file should NOT be committed to git!
  */
 
 #ifndef CONFIG_LOCAL_H
 #define CONFIG_LOCAL_H
 
-// Your WiFi credentials
-#define WIFI_SSID "MyHomeWifi"
-#define WIFI_PASS "MySecurePassword123"
+// =============================================================================
+// BEACON SETTINGS
+// =============================================================================
 
-// Your server IP (find with ipconfig or ifconfig)
-#define SERVER_URL "http://192.168.1.100:5000"
+// LoRa frequency - MUST match your tracker devices!
+// - Americas: 915.0 (default)
+// - Europe: 868.0  
+// - Asia: 433.0
+#define LORA_FREQUENCY 915.0
 
-// Your region's LoRa frequency
-#define LORA_FREQUENCY 915.0  // Americas
+// =============================================================================
+// OPTIONAL SETTINGS - Uncomment to override defaults
+// =============================================================================
 
-// Optional: Custom device ID
-// #define USE_CUSTOM_ID 1
-// #define CUSTOM_DEVICE_ID "TRACKER1"
+// How often to broadcast (milliseconds)
+// Lower = detected faster, but uses more power
+// #define BEACON_BROADCAST_INTERVAL 2000
+
+// LoRa radio settings (must match trackers!)
+// #define LORA_SF 7           // Spreading factor (7-12)
+// #define LORA_BW 125.0       // Bandwidth in kHz
+// #define LORA_CR 5           // Coding rate (5-8)
+// #define LORA_TX_POWER 14    // Transmit power (2-20 dBm)
 
 #endif // CONFIG_LOCAL_H
