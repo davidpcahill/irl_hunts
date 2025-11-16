@@ -1154,13 +1154,27 @@ def api_tracker_ping():
     
     mode_config = get_mode_config()
     
+    # Calculate consent badge for tracker display
+    consent_flags = player.get("consent_flags", {})
+    badge_parts = []
+    if consent_flags.get("physical_tag", False):
+        badge_parts.append("T")
+    if not consent_flags.get("photo_visible", True):
+        badge_parts.append("NP")
+    if not consent_flags.get("location_share", True):
+        badge_parts.append("NL")
+    consent_badge = "".join(badge_parts) if badge_parts else "STD"
+    
+    # Return None for empty team (avoids "null" string in ArduinoJson)
+    team_value = player.get("team") if player.get("team") else None
+    
     return jsonify({
         "phase": game["phase"],
         "status": player["status"],
         "role": player["role"],
         "name": player["name"],
         "in_safe_zone": player["in_safe_zone"],
-        "team": player.get("team"),
+        "team": team_value,
         "notifications": notifs,
         "settings": game["settings"],
         "beacons": list(beacons.keys()),
@@ -1171,7 +1185,10 @@ def api_tracker_ping():
         "infection_mode": mode_config["infection"],
         "photo_required": mode_config["photo_required"],
         "has_photo_of": player.get("has_photo_of", []),
-        "consent_flags": player.get("consent_flags", {}),
+        "consent_flags": consent_flags,
+        "consent_badge": consent_badge,
+        "consent_physical": consent_flags.get("physical_tag", False),
+        "consent_photo": consent_flags.get("photo_visible", True),
         "ready": player.get("ready", False)
     })
 

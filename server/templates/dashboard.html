@@ -881,15 +881,24 @@
         
         // Initialize consent checkboxes from player data
         function initConsent() {
-            const flags = playerData.consent_flags || {
-                physical_tag: false,
-                photo_visible: true,
-                location_share: true
-            };
-            document.getElementById('consent-physical').checked = flags.physical_tag;
-            document.getElementById('consent-photo').checked = flags.photo_visible;
-            document.getElementById('consent-location').checked = flags.location_share;
-            updateConsentBadge();
+            try {
+                const flags = (playerData && playerData.consent_flags) ? playerData.consent_flags : {
+                    physical_tag: false,
+                    photo_visible: true,
+                    location_share: true
+                };
+                const physicalEl = document.getElementById('consent-physical');
+                const photoEl = document.getElementById('consent-photo');
+                const locationEl = document.getElementById('consent-location');
+                
+                if (physicalEl) physicalEl.checked = flags.physical_tag || false;
+                if (photoEl) photoEl.checked = flags.photo_visible !== false;
+                if (locationEl) locationEl.checked = flags.location_share !== false;
+                
+                updateConsentBadge();
+            } catch (e) {
+                console.error('initConsent error:', e);
+            }
         }
         
         function updateConsentBadge() {
@@ -958,6 +967,10 @@
         
         function updateReadyButton() {
             const btn = document.getElementById('ready-btn');
+            if (!btn) {
+                // Button doesn't exist (player hasn't selected role yet)
+                return;
+            }
             if (isReady) {
                 btn.textContent = '❌ Click to Unready';
                 btn.className = 'btn btn-warning';
@@ -1239,13 +1252,24 @@
         }
         
         function updateMyStatus(player) {
+            if (!player) {
+                console.error('updateMyStatus called with null player');
+                return;
+            }
             playerData = player;
-            document.getElementById('your-name').textContent = player.name;
-            document.getElementById('your-role').textContent = player.role.toUpperCase();
-            document.getElementById('your-status').textContent = player.status.toUpperCase();
-            document.getElementById('your-points').textContent = player.points;
-            document.getElementById('your-safezone').textContent = player.in_safe_zone ? 'YES' : 'NO';
-            document.getElementById('header-name').textContent = player.name;
+            
+            // Safely update DOM elements
+            const setTextContent = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value;
+            };
+            
+            setTextContent('your-name', player.name || 'Unknown');
+            setTextContent('your-role', (player.role || 'unknown').toUpperCase());
+            setTextContent('your-status', (player.status || 'unknown').toUpperCase());
+            setTextContent('your-points', player.points || 0);
+            setTextContent('your-safezone', player.in_safe_zone ? 'YES' : 'NO');
+            setTextContent('header-name', player.name || 'Unknown');
             
             // Sync ready state
             isReady = player.status === 'ready' || player.ready === true;
@@ -1913,6 +1937,27 @@
             console.error('Unhandled promise rejection:', e.reason);
             hideLoadingOverlay();
         });
+    </script>
+
+    <!-- FAILSAFE: Hide loading overlay even if main script has errors -->
+    <script>
+        (function() {
+            var hideOverlay = function() {
+                var overlay = document.getElementById('loading-overlay');
+                if (overlay && overlay.parentNode) {
+                    overlay.style.opacity = '0';
+                    setTimeout(function() { 
+                        try { overlay.parentNode.removeChild(overlay); } catch(e) {}
+                    }, 500);
+                }
+            };
+            
+            // Hide after 2 seconds (gives time for normal load)
+            setTimeout(hideOverlay, 2000);
+            
+            // Absolute failsafe after 5 seconds
+            setTimeout(hideOverlay, 5000);
+        })();
     </script>
 </body>
 </html>

@@ -224,9 +224,9 @@ void drawStatusBar() {
   String statusLine = (myName.length() > 0 && myName.indexOf("Player_") != 0) ? myName.substring(0, 10) : NODE_ID;
   statusLine += wifiConnected ? " [W]" : " [W!]";
   statusLine += serverReachable ? "[S]" : "[S?]";
-  if (myTeam.length() > 0) statusLine += " " + myTeam.substring(0, 1);
-  // Show consent badge indicator
-  if (consentBadge != "STD" && consentBadge.length() > 0) {
+  if (myTeam.length() > 0 && myTeam != "null") statusLine += " " + myTeam.substring(0, 1);
+  // Show consent badge indicator (always show for clarity)
+  if (consentBadge.length() > 0) {
     statusLine += " [" + consentBadge + "]";
   }
   if (myReady) statusLine += " R";  // Ready indicator
@@ -494,12 +494,20 @@ void pingServer() {
       String newEmergencyBy = respDoc["emergency_by"].as<String>();
       bool newInfection = respDoc["infection_mode"];
       bool newPhotoReq = respDoc["photo_required"];
-      String newTeam = respDoc["team"].as<String>();
-      bool newConsentPhysical = respDoc["consent_physical"];
-      bool newConsentPhoto = respDoc["consent_photo"];
+      // Handle team - check for null before converting to string
+      String newTeam = "";
+      if (!respDoc["team"].isNull()) {
+        newTeam = respDoc["team"].as<String>();
+      }
+      bool newConsentPhysical = respDoc["consent_physical"] | false;
+      bool newConsentPhoto = respDoc["consent_photo"] | true;
       
-      String newConsentBadge = respDoc["consent_badge"].as<String>();
-      bool newReady = respDoc["ready"];
+      // Handle consent_badge - check for null and provide default
+      String newConsentBadge = "STD";
+      if (!respDoc["consent_badge"].isNull()) {
+        newConsentBadge = respDoc["consent_badge"].as<String>();
+      }
+      bool newReady = respDoc["ready"] | false;
       
       if (newName.length() > 0) myName = newName;
       if (newConsentBadge.length() > 0) consentBadge = newConsentBadge;
