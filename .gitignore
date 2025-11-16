@@ -184,3 +184,23 @@ devices/*/config_local.h
 # Keep example configs in repo
 !server/config_local.py.example
 !devices/*/config_local.h.example
+
+# ==================================================
+# Additional gitignore patterns (auto-added)
+# ==================================================
+
+# Credentials & Local Configs
+*.local.py
+*.local.h
+*_local.py
+*_local.h
+.env.*
+!.env.example
+
+# Python
+*.pyc
+*.pyo
+
+# User Content
+server/uploads/*
+!server/uploads/.gitkeep
