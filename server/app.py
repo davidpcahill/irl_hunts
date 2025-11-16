@@ -321,6 +321,8 @@ def get_player(device_id):
             "nearby_players": [],
             "notifications": [],
             "captured_by": None,
+            "captured_by_device": None,
+            "captured_prey": [],
             "has_photo_of": [],
             "infections": 0,
             "consent_flags": {
@@ -498,7 +500,14 @@ def process_capture(pred_id, prey_id, rssi):
     prey_p["status"] = "captured"
     prey_p["times_captured"] += 1
     prey_p["captured_by"] = pred["name"]
+    prey_p["captured_by_device"] = pred_id  # Track device ID too
     pred["captures"] += 1
+    
+    # Track which prey this predator has captured (for tracker display)
+    if "captured_prey" not in pred:
+        pred["captured_prey"] = []
+    if prey_id not in pred["captured_prey"]:
+        pred["captured_prey"].append(prey_id)
     
     if mode_config["team_mode"] and pred.get("team"):
         team_scores[pred["team"]] = team_scores.get(pred["team"], 0) + 1
@@ -529,14 +538,24 @@ def process_escape(prey_id, beacon_id=None):
     if not prey_p or prey_p["status"] != "captured":
         return False
     
+    # Track who they escaped from (for notification)
+    escaped_from = prey_p.get("captured_by", "")
+    escaped_from_device = prey_p.get("captured_by_device", "")
+    
     prey_p["status"] = "active"
     prey_p["escapes"] += 1
     prey_p["captured_by"] = None
+    prey_p["captured_by_device"] = None
     
     beacon_name = beacons.get(beacon_id, {}).get("name", beacon_id) if beacon_id else "safe zone"
-    log_event("escape", {"prey": prey_p["name"], "beacon": beacon_name})
+    log_event("escape", {"prey": prey_p["name"], "beacon": beacon_name, "from": escaped_from})
     notify_player(prey_id, f"You ESCAPED via {beacon_name}!", "success")
-    socketio.emit("escape", {"prey": prey_p["name"]}, room="all")
+    
+    # Notify the predator who lost their prey
+    if escaped_from_device and escaped_from_device in players:
+        notify_player(escaped_from_device, f"⚠️ {prey_p['name']} ESCAPED! Hunt them again!", "warning")
+    
+    socketio.emit("escape", {"prey": prey_p["name"], "from": escaped_from}, room="all")
     return True
 
 def update_safe_zone(device_id, beacon_rssi):
@@ -1228,6 +1247,22 @@ def api_tracker_ping():
     # Return None for empty team (avoids "null" string in ArduinoJson)
     team_value = player.get("team") if player.get("team") else None
     
+    # Build capture list for predators
+    my_captures = []
+    if player["role"] == "pred":
+        for prey_id in player.get("captured_prey", []):
+            if prey_id in players:
+                prey_p = players[prey_id]
+                my_captures.append({
+                    "device_id": prey_id,
+                    "name": prey_p["name"],
+                    "escaped": prey_p["status"] != "captured" or prey_p.get("captured_by_device") != device_id
+                })
+    
+    # Get capture info for prey
+    captured_by_name = player.get("captured_by", "")
+    captured_by_device = player.get("captured_by_device", "")
+    
     return jsonify({
         "phase": game["phase"],
         "status": player["status"],
@@ -1249,7 +1284,10 @@ def api_tracker_ping():
         "consent_badge": consent_badge,
         "consent_physical": consent_flags.get("physical_tag", False),
         "consent_photo": consent_flags.get("photo_visible", True),
-        "ready": player.get("ready", False)
+        "ready": player.get("ready", False),
+        "my_captures": my_captures,
+        "captured_by_name": captured_by_name,
+        "captured_by_device": captured_by_device
     })
 
 @app.route("/api/tracker/capture", methods=["POST"])
@@ -1567,6 +1605,8 @@ def api_reset_game():
         p["in_safe_zone"] = False
         p["safe_zone_beacon"] = None
         p["captured_by"] = None
+        p["captured_by_device"] = None
+        p["captured_prey"] = []
         p["has_photo_of"] = []
         p["infections"] = 0
         p["nearby_players"] = []

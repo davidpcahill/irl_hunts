@@ -644,10 +644,47 @@ The web dashboard supports keyboard shortcuts for quick actions:
 ### Button Functions on Tracker
 | Action | Function |
 |--------|----------|
-| Single Press (Pred) | Attempt capture |
-| Single Press (Prey) | Show status info |
+| Single Press (Pred) | Attempt capture OR cycle through captured prey list |
+| Single Press (Prey - Active) | Show threat assessment (nearby predators, danger level) |
+| Single Press (Prey - Captured) | Show detailed capture info (who caught you, escape instructions) |
+| Single Press (Prey - Safe Zone) | Confirm safe zone status |
 | Hold 2s + 3 taps | EMERGENCY |
 | Single Press (Unassigned) | Show setup URL |
+
+### Predator Capture Tracking
+When you capture prey as a predator:
+- Your OLED shows current capture count
+- Press button to cycle through your captured prey
+- You're notified when prey escape ("⚠️ PlayerName ESCAPED!")
+- Can see which prey are still captured vs escaped
+
+### Prey Capture Experience
+When captured as prey:
+- OLED prominently displays "!! CAPTURED !!"
+- Shows who captured you (predator name)
+- Clear escape instructions ("FIND SAFE ZONE!")
+- Proximity warnings are suppressed (you're already caught!)
+- Press button for detailed escape guidance
+
+
+### Notification Priority System
+
+The tracker uses a priority system for notifications to ensure critical information is always visible:
+
+| Priority | Type | Duration | Example |
+|----------|------|----------|---------|
+| 100 (Highest) | Captured | 10 seconds | "CAPTURED by ShadowWolf!" |
+| 80 | Danger | 5 seconds | "🚨 CRITICAL! Predator RIGHT HERE!" |
+| 70 | Escape | 5 seconds | "YOU ESCAPED! You're free!" |
+| 60 | Warning | 3 seconds | "⚠️ Predator approaching fast!" |
+| 50 | Success | 3 seconds | "🎯 Captured RabbitRunner!" |
+| 40 | Info | 3 seconds | "Entered safe zone" |
+
+**Key behavior:**
+- Higher priority notifications override lower ones
+- CAPTURED status always takes precedence
+- Proximity warnings are automatically suppressed when captured
+- Escape notifications notify both prey (escaped) and predator (lost their prey)
 
 ### Common RSSI Values
 | RSSI | Distance | Capture? |

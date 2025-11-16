@@ -152,6 +152,17 @@ String notificationType = "info";
 int scrollOffset = 0;
 unsigned long lastScrollUpdate = 0;
 
+// Capture tracking for better UX
+String capturedByName = "";
+String capturedByDevice = "";
+std::vector<String> myCapturedPrey;  // For predators: list of prey IDs they've caught
+std::map<String, String> preyNames;  // Map prey ID to name
+std::map<String, bool> preyEscaped;  // Track if prey has escaped
+int captureViewIndex = 0;  // For scrolling through captures
+unsigned long lastCaptureViewUpdate = 0;
+bool showingCaptureList = false;
+unsigned long captureListExpiry = 0;
+
 bool lastBtnState = HIGH, btnHeld = false, emergencyHoldComplete = false;
 unsigned long btnPressTime = 0, emergencyTapStartTime = 0, lastBtnRelease = 0;
 int emergencyTapCount = 0;
@@ -162,10 +173,43 @@ volatile bool rxFlag = false;
 
 void setRxFlag() { rxFlag = true; }
 
+// Notification priority levels (higher = more important)
+int getNotificationPriority(const String& type) {
+  if (type == "captured") return 100;  // HIGHEST - you're caught!
+  if (type == "danger") return 80;
+  if (type == "escape") return 70;
+  if (type == "warning") return 60;
+  if (type == "success") return 50;
+  if (type == "info") return 40;
+  return 30;
+}
+
 void showNotification(const String& msg, const String& type = "info") {
+  // Don't override higher priority notifications
+  if (hasActiveNotification()) {
+    int currentPriority = getNotificationPriority(notificationType);
+    int newPriority = getNotificationPriority(type);
+    
+    // Only override if new notification is higher or equal priority
+    // OR if current notification is about to expire (< 500ms left)
+    if (newPriority < currentPriority && (notificationExpiry - millis() > 500)) {
+      Serial.println("[NOTIF] Blocked low priority: " + msg);
+      return;  // Don't override important notification
+    }
+  }
+  
   currentNotification = msg;
   notificationType = type;
-  notificationExpiry = millis() + NOTIFICATION_DURATION;
+  
+  // Critical notifications (captured) stay longer
+  if (type == "captured") {
+    notificationExpiry = millis() + 10000;  // 10 seconds for captured
+  } else if (type == "danger" || type == "escape") {
+    notificationExpiry = millis() + 5000;   // 5 seconds for danger/escape
+  } else {
+    notificationExpiry = millis() + NOTIFICATION_DURATION;
+  }
+  
   Serial.println("[NOTIF] " + type + ": " + msg);
 }
 
@@ -336,9 +380,119 @@ void displayServerTimeout() {
   display.display();
 }
 
+
+void displayCaptureList() {
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(64, 0, "YOUR CAPTURES");
+  display.setFont(ArialMT_Plain_10);
+  
+  if (myCapturedPrey.size() == 0) {
+    display.drawString(64, 25, "No captures yet");
+    display.drawString(64, 40, "Hunt some prey!");
+  } else {
+    int startIdx = captureViewIndex % myCapturedPrey.size();
+    String preyId = myCapturedPrey[startIdx];
+    String preyName = preyNames.count(preyId) ? preyNames[preyId] : preyId;
+    bool escaped = preyEscaped.count(preyId) ? preyEscaped[preyId] : false;
+    
+    display.drawString(64, 18, String(startIdx + 1) + "/" + String(myCapturedPrey.size()));
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(64, 32, preyName);
+    display.setFont(ArialMT_Plain_10);
+    
+    if (escaped) {
+      display.drawString(64, 50, "⚠️ ESCAPED! Hunt again!");
+    } else {
+      display.drawString(64, 50, "✓ Still captured");
+    }
+  }
+  
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.display();
+}
+
+void displayCapturedStatus() {
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(64, 0, "!! CAPTURED !!");
+  display.setFont(ArialMT_Plain_10);
+  
+  if (capturedByName.length() > 0) {
+    display.drawString(64, 20, "By: " + capturedByName);
+  }
+  
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(64, 35, "FIND SAFE ZONE!");
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(64, 54, "Get to beacon to escape");
+  
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.display();
+}
+
+void displayThreatAssessment() {
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(64, 0, "THREAT LEVEL");
+  display.setFont(ArialMT_Plain_10);
+  
+  if (playerRssi.size() == 0) {
+    display.drawString(64, 25, "✓ NO THREATS");
+    display.drawString(64, 40, "Area appears clear");
+  } else {
+    int closest = -999;
+    String closestId = "";
+    int dangerCount = 0;
+    
+    for (auto& p : playerRssi) {
+      if (p.second > closest) {
+        closest = p.second;
+        closestId = p.first;
+      }
+      if (p.second > -70) dangerCount++;
+    }
+    
+    if (closest > -50) {
+      display.drawString(64, 18, "🚨 EXTREME DANGER!");
+      display.drawString(64, 32, "Predator: " + closestId);
+      display.drawString(64, 46, String(closest) + "dB - RUN NOW!");
+    } else if (closest > -65) {
+      display.drawString(64, 18, "⚠️ HIGH THREAT");
+      display.drawString(64, 32, dangerCount > 1 ? String(dangerCount) + " predators nearby" : "Predator nearby");
+      display.drawString(64, 46, "Closest: " + String(closest) + "dB");
+    } else {
+      display.drawString(64, 18, "⚡ MODERATE RISK");
+      display.drawString(64, 32, String(playerRssi.size()) + " detected");
+      display.drawString(64, 46, "Stay alert!");
+    }
+  }
+  
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.display();
+}
+
 void displayMain() {
   if (emergencyActive) { displayEmergencyScreen(); return; }
   if (!serverReachable && (millis() - lastSuccessfulPing) > SERVER_TIMEOUT_THRESHOLD) { displayServerTimeout(); return; }
+  
+  // CAPTURED status takes ABSOLUTE priority for prey
+  if (myRole == "prey" && myStatus == "captured" && !hasActiveNotification()) {
+    displayCapturedStatus();
+    return;
+  }
+  
+  // Show capture list if predator requested it
+  if (showingCaptureList && millis() < captureListExpiry) {
+    displayCaptureList();
+    return;
+  } else {
+    showingCaptureList = false;
+  }
+  
   if (hasActiveNotification()) { displayNotificationScreen(); return; }
   
   display.clear();
@@ -361,9 +515,26 @@ void displayMain() {
   if (myRole == "pred") {
     if (infectionMode) line2 = "PREDATOR (Infect!)";
     else if (photoRequired) line2 = "PREDATOR (Photo first!)";
-    else line2 = "PREDATOR (Hunt!)";
+    else {
+      // Show capture count for predators
+      int activeCaptures = 0;
+      for (auto& prey : myCapturedPrey) {
+        if (!preyEscaped[prey]) activeCaptures++;
+      }
+      if (activeCaptures > 0) {
+        line2 = "PRED | " + String(activeCaptures) + " captured";
+      } else {
+        line2 = "PREDATOR (Hunt!)";
+      }
+    }
   } else if (myRole == "prey") {
-    line2 = infectionMode ? "PREY (Don't get infected!)" : "PREY (Survive!)";
+    if (myStatus == "captured") {
+      line2 = "!! CAPTURED !!";
+    } else if (infectionMode) {
+      line2 = "PREY (Don't get infected!)";
+    } else {
+      line2 = "PREY (Survive!)";
+    }
   }
   display.drawString(0, 12, line2);
   
@@ -375,9 +546,17 @@ void displayMain() {
   else line3 += " [" + gamePhase + "]";
   drawScrollingText(24, line3);
   
-  String line4 = "Status: " + myStatus;
-  if (inSafeZone) {
-    line4 = "🏠 IN SAFE ZONE";
+  String line4 = "";
+  if (myStatus == "captured" && myRole == "prey") {
+    if (capturedByName.length() > 0) {
+      line4 = "By: " + capturedByName + " | FIND BEACON!";
+    } else {
+      line4 = "CAPTURED! Find safe zone!";
+    }
+  } else if (inSafeZone) {
+    line4 = "🏠 SAFE ZONE";
+  } else {
+    line4 = "Status: " + myStatus;
   }
   display.drawString(0, 36, line4);
   
@@ -390,21 +569,38 @@ void displayMain() {
   }
   
   String line5 = "";
-  if (playerRssi.size() == 0) line5 = "No players nearby";
-  else if (playerRssi.size() == 1) {
-    int strongest = -999; String strongestId = "";
-    for (auto& p : playerRssi) {
-      strongest = p.second; strongestId = p.first;
+  if (myRole == "pred") {
+    // Predator sees targets
+    if (playerRssi.size() == 0) {
+      line5 = "No prey detected";
+    } else {
+      int strongest = -999; String strongestId = "";
+      for (auto& p : playerRssi) {
+        if (p.second > strongest) { strongest = p.second; strongestId = p.first; }
+      }
+      if (playerRssi.size() == 1) {
+        line5 = "🎯 Target: " + strongestId + " " + String(strongest) + "dB";
+      } else {
+        line5 = "🎯 " + String(playerRssi.size()) + " prey | Closest: " + String(strongest) + "dB";
+      }
     }
-    line5 = (myRole == "pred" ? "Target: " : "Threat: ") + strongestId + " (" + String(strongest) + "dB)";
   } else {
-    // Multiple players - show count and closest
-    int strongest = -999; String strongestId = "";
-    for (auto& p : playerRssi) {
-      if (p.second > strongest) { strongest = p.second; strongestId = p.first; }
+    // Prey sees threats
+    if (myStatus == "captured") {
+      line5 = "BTN = Show escape info";
+    } else if (playerRssi.size() == 0) {
+      line5 = "✓ No threats nearby";
+    } else {
+      int strongest = -999;
+      for (auto& p : playerRssi) {
+        if (p.second > strongest) strongest = p.second;
+      }
+      if (strongest > -60) {
+        line5 = "⚠️ DANGER! " + String(playerRssi.size()) + " pred " + String(strongest) + "dB";
+      } else {
+        line5 = "⚠️ " + String(playerRssi.size()) + " pred nearby | " + String(strongest) + "dB";
+      }
     }
-    String prefix = (myRole == "pred" ? "🎯 " : "⚠️ ");
-    line5 = prefix + String(playerRssi.size()) + " nearby | Best: " + strongestId + " " + String(strongest) + "dB";
   }
   drawScrollingText(48, line5);
   display.display();
@@ -519,15 +715,15 @@ void receivePackets() {
             }
           }
           
-          // Proximity warnings for prey (enhanced with player count)
-          if (!emergencyActive && myRole == "prey" && type == "pred" && !inSafeZone) {
+          // Proximity warnings for prey (but NOT if already captured!)
+          if (!emergencyActive && myRole == "prey" && type == "pred" && !inSafeZone && myStatus != "captured") {
             bool approaching = (oldRssi != -999 && (int)rssi > oldRssi + 3);
             int predCount = 0;
             for (auto& p : playerRssi) {
-              // Count predators (we can't know role from RSSI map alone, but we can warn about multiple signals)
               if (p.second > -80) predCount++;
             }
             
+            // Lower priority warnings - captured status will override these
             if (rssi > -50) {
               showNotification("🚨 CRITICAL! Predator RIGHT HERE!", "danger");
             } else if (rssi > -55) {
@@ -538,12 +734,12 @@ void receivePackets() {
               }
             } else if (rssi > -65) {
               if (approaching) {
-                showNotification("⚠️ Predator approaching fast!", "danger");
+                showNotification("⚠️ Predator approaching fast!", "warning");
               } else {
                 showNotification("⚠️ Predator nearby (" + String(playerRssi.size()) + " total)", "warning");
               }
             } else if (rssi > -75 && approaching) {
-              showNotification("📡 Predator detected, moving closer", "warning");
+              showNotification("📡 Predator detected, moving closer", "info");
             }
           }
           
@@ -690,10 +886,58 @@ void pingServer() {
       }
       if (myStatus != newStatus) {
         String oldStatus = myStatus; myStatus = newStatus;
-        if (newStatus == "captured") showNotification("YOU WERE CAPTURED!", "danger");
-        else if (oldStatus == "captured" && newStatus == "active") {
+        if (newStatus == "captured") {
+          // Get capture info from response
+          if (!respDoc["captured_by_name"].isNull()) {
+            capturedByName = respDoc["captured_by_name"].as<String>();
+          }
+          if (!respDoc["captured_by_device"].isNull()) {
+            capturedByDevice = respDoc["captured_by_device"].as<String>();
+          }
+          showNotification("CAPTURED by " + (capturedByName.length() > 0 ? capturedByName : "predator") + "!", "captured");
+        } else if (oldStatus == "captured" && newStatus == "active") {
           escapeCount++;
-          showNotification("YOU ESCAPED!", "success");
+          capturedByName = "";
+          capturedByDevice = "";
+          showNotification("YOU ESCAPED! You're free!", "escape");
+        }
+      }
+      
+      // Update capture list for predators
+      if (myRole == "pred" && respDoc.containsKey("my_captures")) {
+        JsonArray captures = respDoc["my_captures"];
+        
+        // Check for new captures or escapes
+        for (JsonVariant cap : captures) {
+          String preyId = cap["device_id"].as<String>();
+          String preyName = cap["name"].as<String>();
+          bool escaped = cap["escaped"].as<bool>();
+          
+          // Store prey name
+          preyNames[preyId] = preyName;
+          
+          // Check if this is a new capture
+          bool found = false;
+          for (auto& existing : myCapturedPrey) {
+            if (existing == preyId) {
+              found = true;
+              // Check if they escaped (and we didn't know)
+              if (escaped && !preyEscaped[preyId]) {
+                preyEscaped[preyId] = true;
+                showNotification("⚠️ " + preyName + " ESCAPED!", "warning");
+              }
+              break;
+            }
+          }
+          
+          if (!found) {
+            // New capture!
+            myCapturedPrey.push_back(preyId);
+            preyEscaped[preyId] = escaped;
+            if (!escaped) {
+              showNotification("🎯 Captured " + preyName + "!", "success");
+            }
+          }
         }
       }
       if (myRole != newRole && newRole != "unassigned" && newRole.length() > 0) {
@@ -841,30 +1085,41 @@ void handleButton() {
     unsigned long holdTime = now - btnPressTime;
     lastBtnRelease = now;
     if (!emergencyHoldComplete && holdTime < EMERGENCY_HOLD_TIME) {
-      if (myRole == "pred") attemptCapture();
-      else if (myRole == "prey") {
-        if (myStatus == "captured") {
-          if (infectionMode) {
-            showNotification("INFECTED! You're now a predator!", "danger");
-          } else {
-            showNotification("CAPTURED! Find safe zone NOW!", "danger");
-          }
-        } else if (inSafeZone) {
-          showNotification("SAFE! Recover here. " + String(playerRssi.size()) + " nearby", "success");
-        } else if (playerRssi.size() > 0) {
-          int closest = -999;
-          for (auto& p : playerRssi) {
-            if (p.second > closest) closest = p.second;
-          }
-          if (closest > -60) {
-            showNotification("DANGER! Predator very close!", "danger");
-          } else {
-            showNotification("Threat nearby (" + String(closest) + "dB)", "warning");
-          }
+      if (myRole == "pred") {
+        // Toggle between capture attempt and viewing capture list
+        static bool lastWasCapture = true;
+        if (playerRssi.size() > 0 && lastWasCapture) {
+          attemptCapture();
+          lastWasCapture = false;
+        } else if (myCapturedPrey.size() > 0) {
+          // Show capture list
+          showingCaptureList = true;
+          captureListExpiry = millis() + 5000;  // Show for 5 seconds
+          captureViewIndex++;  // Cycle through captures
+          lastWasCapture = true;
         } else {
-          showNotification("Safe for now. Stay alert!", "info");
+          attemptCapture();  // No captures yet, just try to capture
+          lastWasCapture = false;
         }
-      } else showNotification("Set role at " + String(server_url), "info");
+      } else if (myRole == "prey") {
+        if (myStatus == "captured") {
+          // Show detailed capture info
+          String msg = "CAPTURED";
+          if (capturedByName.length() > 0) {
+            msg += " by " + capturedByName;
+          }
+          msg += "! Find a SAFE ZONE beacon to escape. Look for SZ beacons nearby!";
+          showNotification(msg, "captured");
+        } else if (inSafeZone) {
+          showNotification("✓ SAFE ZONE! You're protected here. " + String(playerRssi.size()) + " signals detected", "success");
+        } else {
+          // Show threat assessment
+          displayThreatAssessment();
+          delay(3000);  // Show for 3 seconds
+        }
+      } else {
+        showNotification("Set role at " + String(server_url), "info");
+      }
     }
     btnHeld = true;
   }
@@ -942,6 +1197,14 @@ void setup() {
   displayBigText("Ready!", "ID: " + NODE_ID);
   Serial.println("Ready! Emergency: Hold 2s + tap 3x");
   delay(2000);
+  
+  // Initialize capture tracking
+  myCapturedPrey.clear();
+  preyNames.clear();
+  preyEscaped.clear();
+  capturedByName = "";
+  capturedByDevice = "";
+  
   showNotification("Open browser to set your role", "info");
 }
 
