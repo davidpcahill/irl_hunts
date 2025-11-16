@@ -641,15 +641,46 @@ The web dashboard supports keyboard shortcuts for quick actions:
 
 ## 📋 Quick Reference Card
 
-### Button Functions on Tracker
-| Action | Function |
-|--------|----------|
-| Single Press (Pred) | Attempt capture OR cycle through captured prey list |
-| Single Press (Prey - Active) | Show threat assessment (nearby predators, danger level) |
-| Single Press (Prey - Captured) | Show detailed capture info (who caught you, escape instructions) |
-| Single Press (Prey - Safe Zone) | Confirm safe zone status |
-| Hold 2s + 3 taps | EMERGENCY |
-| Single Press (Unassigned) | Show setup URL |
+### Button Functions on Tracker (v5.0 Interactive)
+
+**Button Press Types:**
+| Duration | Action |
+|----------|--------|
+| Short (<500ms) | Context-sensitive action |
+| Medium (500ms-1.5s) | Cycle to next information screen |
+| Long (2s+) + 3 taps | EMERGENCY trigger |
+
+**Information Screens (cycle with medium press):**
+1. **MAIN** - Status, role, nearby count, points
+2. **NEARBY** - List of nearby players with RSSI and consent
+3. **STATS** - Personal statistics (points, captures/escapes)
+4. **EVENTS** - Recent notifications and game events
+5. **CHAT** - Last chat messages from server
+6. **HELP** - Controls reference and device info
+
+**Short Press Actions by Screen:**
+| Screen | Action |
+|--------|--------|
+| MAIN (Pred) | Attempt capture on nearest prey |
+| MAIN (Prey) | Show threat level assessment |
+| MAIN (Captured) | Show escape instructions |
+| NEARBY | Cycle through nearby player details |
+| STATS | Refresh statistics |
+| EVENTS | Clear old events |
+| CHAT | Show hint to use phone |
+| HELP | Return to main screen |
+
+**LED Patterns:**
+| Pattern | Meaning |
+|---------|---------|
+| Double blink | Predator (hunting) |
+| Slow single blink | Prey (hiding) |
+| Breathing (pulse) | In safe zone |
+| Fast blink | Captured status |
+| Rapid strobe | Emergency active |
+| Very fast blink | No WiFi connection |
+
+**Auto-Return:** Screens automatically return to MAIN after 15 seconds of inactivity.
 
 ### Predator Capture Tracking
 When you capture prey as a predator:

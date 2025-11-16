@@ -205,14 +205,76 @@ Physical locations with beacon devices:
 - Settings configuration
 - Bounty system
 
-### Tracker Display
+### Tracker Display (Interactive Edition v5.0)
+
+The tracker now features **6 cycling information screens** accessible by holding the button:
+
+**Screen 1: MAIN STATUS**
 ```
-T9EF0 | pred
-> active
-Game: running
-3 nearby | Best: TA2B3 -65dB
-BTN=Capture | 2 attempts
+ShadowWolf [WS] [T]  1/6
+PREDATOR [Hunt]
+Classic Hunt LIVE
+Pts: 350 | active
+🎯 3 prey | Best: -65dB
 ```
+
+**Screen 2: NEARBY PLAYERS**
+```
+NEARBY PLAYERS (5)
+TA2B3 prey -52dB [STD]
+T1F4E pred -68dB [T]
+T9C01 prey -71dB
++2 more...
+```
+
+**Screen 3: PERSONAL STATS**
+```
+MY STATISTICS
+Points: 450
+Captures: 4
+Sightings: 6
+Holding: 2 prey
+```
+
+**Screen 4: RECENT EVENTS**
+```
+RECENT EVENTS (8)
+success: Captured Rabb
+warning: TA2B3 ESCAPED
+info: Game started!
+danger: NEW PREDATOR...
+```
+
+**Screen 5: CHAT MESSAGES**
+```
+CHAT MESSAGES
+ShadowWolf:
+ Let's hunt north!
+Admin:
+ 5 minutes left!
+```
+
+**Screen 6: HELP**
+```
+CONTROLS & HELP
+Short press: Action
+Hold 1s: Next screen
+Hold 2s+3tap: EMERGENCY
+ID: T9EF0
+```
+
+**Button Controls:**
+- **Short press** (<500ms): Context action (capture/threat check)
+- **Medium press** (500ms-1.5s): Cycle to next screen
+- **Long hold** (2s) + 3 taps: Emergency trigger
+
+**LED Patterns:**
+- Predator: Double blink
+- Prey: Slow single blink
+- Safe Zone: Breathing pulse effect
+- Captured: Fast blink
+- Emergency: Rapid strobe
+- No WiFi: Very fast blink
 
 ---
 
