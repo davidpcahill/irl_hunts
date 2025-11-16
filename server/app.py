@@ -248,6 +248,15 @@ def now():
 def now_str():
     return datetime.now().strftime("%H:%M:%S")
 
+
+def validate_game_action(required_phase=None, block_on_emergency=True):
+    """Helper to validate common game action preconditions"""
+    if required_phase and game["phase"] != required_phase:
+        return False, f"Game must be in {required_phase} phase"
+    if block_on_emergency and game["emergency"]:
+        return False, "Action blocked: Emergency active"
+    return True, "OK"
+
 def get_mode_config():
     return GAME_MODES.get(game["mode"], GAME_MODES["classic"])
 
@@ -301,7 +310,13 @@ def get_player(device_id):
             "notifications": [],
             "captured_by": None,
             "has_photo_of": [],
-            "infections": 0
+            "infections": 0,
+            "consent_flags": {
+                "physical_tag": False,  # Allow physical tagging (tapping shoulder)
+                "photo_visible": True,  # Allow photos to be taken
+                "location_share": True  # Share location hints
+            },
+            "ready": False
         }
         log_event("player_join", {"id": device_id, "name": f"Player_{device_id[-4:]}"})
     return players[device_id]
@@ -374,7 +389,9 @@ def get_leaderboard():
             "online": p["online"],
             "in_safe_zone": p["in_safe_zone"],
             "team": p.get("team"),
-            "infections": p.get("infections", 0)
+            "infections": p.get("infections", 0),
+            "consent_physical": p.get("consent_physical", False),
+            "consent_photo": p.get("consent_photo", True)
         }
         if p["role"] == "pred":
             preds.append(entry)
@@ -619,14 +636,18 @@ def check_game_end():
 def cleanup_old_cooldowns():
     """Clean up old cooldown entries to prevent memory leak"""
     current_time = time.time()
-    # Clean capture cooldowns older than 5 minutes
-    expired_captures = [k for k, v in capture_cooldowns.items() if current_time - v > 300]
-    for k in expired_captures:
-        del capture_cooldowns[k]
-    # Clean sighting cooldowns older than 10 minutes
-    expired_sightings = [k for k, v in sighting_cooldowns.items() if current_time - v > 600]
-    for k in expired_sightings:
-        del sighting_cooldowns[k]
+    # Clean capture cooldowns older than 5 minutes (thread-safe copy)
+    try:
+        expired_captures = [k for k, v in list(capture_cooldowns.items()) if current_time - v > 300]
+        for k in expired_captures:
+            capture_cooldowns.pop(k, None)
+        # Clean sighting cooldowns older than 10 minutes
+        expired_sightings = [k for k, v in list(sighting_cooldowns.items()) if current_time - v > 600]
+        for k in expired_sightings:
+            sighting_cooldowns.pop(k, None)
+    except RuntimeError:
+        # Dictionary changed size during iteration - will clean next cycle
+        pass
 
 def background_tasks():
     global background_thread_stop
@@ -810,7 +831,27 @@ def api_update_player():
             return jsonify({"error": "Must be in safe zone to change role"}), 400
     
     if "status" in data and data["status"] in ["ready", "lobby", "dnd"]:
+        old_status = player["status"]
         player["status"] = data["status"]
+        # Track ready state separately for toggle functionality
+        if data["status"] == "ready":
+            player["ready"] = True
+        elif data["status"] == "lobby":
+            player["ready"] = False
+        # Log ready state changes
+        if old_status != data["status"]:
+            if data["status"] == "ready":
+                log_event("player_ready", {"player": player["name"]})
+            elif old_status == "ready" and data["status"] == "lobby":
+                log_event("player_unready", {"player": player["name"]})
+    
+    # Update consent flags
+    if "consent_physical" in data:
+        player["consent_physical"] = bool(data["consent_physical"])
+    if "consent_photo" in data:
+        player["consent_photo"] = bool(data["consent_photo"])
+    if "consent_chat" in data:
+        player["consent_chat"] = bool(data["consent_chat"])
     
     if "in_safe_zone" in data and game["settings"]["honor_system"]:
         if data["in_safe_zone"] and not player["in_safe_zone"]:
@@ -819,6 +860,20 @@ def api_update_player():
                 process_escape(device_id)
         elif not data["in_safe_zone"] and player["in_safe_zone"]:
             player["in_safe_zone"] = False
+    
+    # Update consent flags if provided
+    if "consent_flags" in data and isinstance(data["consent_flags"], dict):
+        for key in ["physical_tag", "photo_visible", "location_share"]:
+            if key in data["consent_flags"]:
+                player["consent_flags"][key] = bool(data["consent_flags"][key])
+        log_event("consent_update", {"player": player["name"], "flags": player["consent_flags"]})
+    
+    # Update consent flags if provided
+    if "consent_flags" in data and isinstance(data["consent_flags"], dict):
+        for key in ["physical_tag", "photo_visible", "location_share"]:
+            if key in data["consent_flags"]:
+                player["consent_flags"][key] = bool(data["consent_flags"][key])
+        log_event("consent_update", {"player": player["name"], "flags": player["consent_flags"]})
     
     player["last_seen"] = now()
     player["last_ping"] = time.time()
@@ -990,6 +1045,14 @@ def api_upload_sighting():
     if player["role"] == "prey" and target["role"] != "pred":
         return jsonify({"error": "Prey can only spot preds"}), 400
     
+    # Check consent for photography
+    if not target.get("consent_flags", {}).get("photo_visible", True):
+        return jsonify({"error": f"{target['name']} has disabled photo visibility"}), 403
+    
+    # Check consent for photography
+    if not target.get("consent_flags", {}).get("photo_visible", True):
+        return jsonify({"error": f"{target['name']} has disabled photo visibility"}), 403
+    
     # Check sighting cooldown for this specific target
     cooldown_key = f"{device_id}_{target_id}"
     current_time = time.time()
@@ -1088,7 +1151,11 @@ def api_tracker_ping():
         player["nearby_players"] = nearby[:5]
         
         if nearby:
-            player["last_location_hint"] = f"Near {nearby[0]['name']} ({nearby[0]['rssi']}dB)"
+            # Respect location sharing consent
+            if player.get("consent_flags", {}).get("location_share", True):
+                player["last_location_hint"] = f"Near {nearby[0]['name']} ({nearby[0]['rssi']}dB)"
+            else:
+                player["last_location_hint"] = "Location hidden by player preference"
     
     if "beacon_rssi" in data:
         update_safe_zone(device_id, data["beacon_rssi"])
@@ -1114,7 +1181,9 @@ def api_tracker_ping():
         "emergency_by": game["emergency_by"],
         "infection_mode": mode_config["infection"],
         "photo_required": mode_config["photo_required"],
-        "has_photo_of": player.get("has_photo_of", [])
+        "has_photo_of": player.get("has_photo_of", []),
+        "consent_flags": player.get("consent_flags", {}),
+        "ready": player.get("ready", False)
     })
 
 @app.route("/api/tracker/capture", methods=["POST"])
@@ -1172,9 +1241,13 @@ def api_add_beacon():
     if len(beacon_id) < 4 or len(beacon_id) > 10:
         return jsonify({"error": "Beacon ID must be 4-10 characters"}), 400
     
-    rssi = int(rssi)
+    try:
+        rssi = int(rssi)
+    except (ValueError, TypeError):
+        return jsonify({"error": "RSSI must be a valid integer"}), 400
+    
     if rssi > -30 or rssi < -100:
-        return jsonify({"error": "RSSI threshold must be between -100 and -30"}), 400
+        return jsonify({"error": "RSSI threshold must be between -100 and -30 (e.g., -75)"}), 400
     
     beacons[beacon_id] = {"name": name, "rssi": rssi, "active": True}
     log_event("beacon_add", {"id": beacon_id, "name": name, "rssi": rssi})
@@ -1773,6 +1846,76 @@ def api_kick_player():
         log_event("player_kick", {"player": name})
         notify_all_players(f"{name} was removed from the game", "info")
     return jsonify({"success": True})
+
+
+# =============================================================================
+# CONSENT API
+# =============================================================================
+
+@app.route("/api/player/consent", methods=["GET"])
+@login_required
+def api_get_consent():
+    """Get current player's consent settings"""
+    device_id = session["device_id"]
+    if device_id == "ADMIN":
+        return jsonify({"error": "Admin account"}), 400
+    
+    player = get_player(device_id)
+    return jsonify(player.get("consent_flags", {
+        "physical_tag": False,
+        "photo_visible": True,
+        "location_share": True
+    }))
+
+@app.route("/api/player/consent", methods=["PUT"])
+@login_required
+def api_update_consent():
+    """Update player's consent settings"""
+    device_id = session["device_id"]
+    if device_id == "ADMIN":
+        return jsonify({"error": "Admin account"}), 400
+    
+    player = get_player(device_id)
+    data = request.json or {}
+    
+    if "consent_flags" not in player:
+        player["consent_flags"] = {
+            "physical_tag": False,
+            "photo_visible": True,
+            "location_share": True
+        }
+    
+    for key in ["physical_tag", "photo_visible", "location_share"]:
+        if key in data:
+            player["consent_flags"][key] = bool(data[key])
+    
+    log_event("consent_update", {"player": player["name"], "flags": player["consent_flags"]})
+    socketio.emit("player_update", player, room="all")
+    
+    return jsonify({"success": True, "consent_flags": player["consent_flags"]})
+
+@app.route("/api/players/consent_summary", methods=["GET"])
+def api_consent_summary():
+    """Get summary of consent settings for all players (for badges)"""
+    summary = {}
+    for device_id, player in players.items():
+        if player["role"] != "unassigned":
+            flags = player.get("consent_flags", {})
+            # Create consent indicator string for badge
+            indicators = []
+            if flags.get("physical_tag", False):
+                indicators.append("T")  # Touch OK
+            if not flags.get("photo_visible", True):
+                indicators.append("NP")  # No Photo
+            if not flags.get("location_share", True):
+                indicators.append("NL")  # No Location
+            
+            summary[device_id] = {
+                "name": player["name"],
+                "consent_badge": "".join(indicators) if indicators else "STD",  # Standard
+                "flags": flags
+            }
+    return jsonify(summary)
 
 # =============================================================================
 # WEBSOCKET

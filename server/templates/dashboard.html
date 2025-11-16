@@ -665,6 +665,34 @@
                     <div id="photographed-list" style="margin-top: 5px; color: #ccc;">None yet</div>
                 </div>
                 
+                <!-- Consent Settings -->
+                <div style="margin-top: 15px; padding: 15px; background: rgba(108,92,231,0.1); border: 1px solid rgba(108,92,231,0.3); border-radius: 12px;">
+                    <h3 style="color: #a29bfe; font-size: 14px; margin-bottom: 10px;">🛡️ Consent Settings</h3>
+                    <div style="font-size: 12px; color: #888; margin-bottom: 10px;">
+                        Control how others can interact with you
+                    </div>
+                    
+                    <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; cursor: pointer;">
+                        <input type="checkbox" id="consent-physical" onchange="updateConsent()" style="width: 18px; height: 18px;">
+                        <span style="color: #ccc;">👋 Allow physical tagging (consensual touch)</span>
+                    </label>
+                    
+                    <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; cursor: pointer;">
+                        <input type="checkbox" id="consent-photo" checked onchange="updateConsent()" style="width: 18px; height: 18px;">
+                        <span style="color: #ccc;">📸 Allow photos to be taken of me</span>
+                    </label>
+                    
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="consent-location" checked onchange="updateConsent()" style="width: 18px; height: 18px;">
+                        <span style="color: #ccc;">📍 Share my location hints</span>
+                    </label>
+                    
+                    <div id="consent-badge-preview" style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 11px; text-align: center;">
+                        Badge: <span id="consent-badge-text" style="color: #feca57; font-weight: 600;">STD</span>
+                        <div style="color: #666; margin-top: 3px;">This shows on your tracker</div>
+                    </div>
+                </div>
+                
                 <div style="margin-top: 15px;">
                     {% if player.role == 'unassigned' %}
                     <p style="color: #feca57; margin-bottom: 10px;">Choose your role:</p>
@@ -673,9 +701,12 @@
                         <button class="btn btn-pred" onclick="setRole('pred')">🦊 Predator</button>
                     </div>
                     {% else %}
-                    <button class="btn btn-success" onclick="setReady()" id="ready-btn" style="width: 100%;">
+                    <button class="btn btn-success" onclick="toggleReady()" id="ready-btn" style="width: 100%;">
                         ✅ Ready to Play
                     </button>
+                    <p id="ready-hint" style="color: #888; font-size: 11px; margin-top: 5px; text-align: center;">
+                        Click again to unready
+                    </p>
                     {% endif %}
                 </div>
             </div>
@@ -832,6 +863,184 @@
     const socket = io();
         const playerId = "{{ player.device_id }}";
         let playerData = {{ player|tojson }};
+        let isReady = false;
+        
+        // Initialize consent checkboxes from player data
+        function initConsent() {
+            const flags = playerData.consent_flags || {
+                physical_tag: false,
+                photo_visible: true,
+                location_share: true
+            };
+            document.getElementById('consent-physical').checked = flags.physical_tag;
+            document.getElementById('consent-photo').checked = flags.photo_visible;
+            document.getElementById('consent-location').checked = flags.location_share;
+            updateConsentBadge();
+        }
+        
+        function updateConsentBadge() {
+            const physical = document.getElementById('consent-physical').checked;
+            const photo = document.getElementById('consent-photo').checked;
+            const location = document.getElementById('consent-location').checked;
+            
+            let badge = [];
+            if (physical) badge.push("T");  // Touch OK
+            if (!photo) badge.push("NP");   // No Photo
+            if (!location) badge.push("NL"); // No Location
+            
+            const badgeText = badge.length > 0 ? badge.join("") : "STD";
+            document.getElementById('consent-badge-text').textContent = badgeText;
+        }
+        
+        async function updateConsent() {
+            const flags = {
+                physical_tag: document.getElementById('consent-physical').checked,
+                photo_visible: document.getElementById('consent-photo').checked,
+                location_share: document.getElementById('consent-location').checked
+            };
+            
+            updateConsentBadge();
+            
+            try {
+                const resp = await fetch('/api/player/consent', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(flags)
+                });
+                
+                if (resp.ok) {
+                    notify('Consent settings updated', 'success');
+                    playerData.consent_flags = flags;
+                } else {
+                    notify('Failed to update consent', 'error');
+                }
+            } catch (err) {
+                notify('Connection error', 'error');
+            }
+        }
+        
+        async function toggleReady() {
+            const newStatus = isReady ? 'lobby' : 'ready';
+            
+            try {
+                const resp = await fetch('/api/player', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: newStatus})
+                });
+                
+                if (resp.ok) {
+                    isReady = !isReady;
+                    updateReadyButton();
+                    notify(isReady ? 'You are ready!' : 'You are no longer ready', isReady ? 'success' : 'info');
+                } else {
+                    const data = await resp.json();
+                    notify(data.error || 'Failed to update status', 'error');
+                }
+            } catch (err) {
+                notify('Failed to update ready status', 'error');
+            }
+        }
+        
+        function updateReadyButton() {
+            const btn = document.getElementById('ready-btn');
+            if (isReady) {
+                btn.textContent = '❌ Click to Unready';
+                btn.className = 'btn btn-warning';
+            } else {
+                btn.textContent = '✅ Ready to Play';
+                btn.className = 'btn btn-success';
+            }
+        }
+        let isReady = false;
+        
+        // Initialize consent checkboxes from player data
+        function initConsent() {
+            const flags = playerData.consent_flags || {
+                physical_tag: false,
+                photo_visible: true,
+                location_share: true
+            };
+            document.getElementById('consent-physical').checked = flags.physical_tag;
+            document.getElementById('consent-photo').checked = flags.photo_visible;
+            document.getElementById('consent-location').checked = flags.location_share;
+            updateConsentBadge();
+        }
+        
+        function updateConsentBadge() {
+            const physical = document.getElementById('consent-physical').checked;
+            const photo = document.getElementById('consent-photo').checked;
+            const location = document.getElementById('consent-location').checked;
+            
+            let badge = [];
+            if (physical) badge.push("T");  // Touch OK
+            if (!photo) badge.push("NP");   // No Photo
+            if (!location) badge.push("NL"); // No Location
+            
+            const badgeText = badge.length > 0 ? badge.join("") : "STD";
+            document.getElementById('consent-badge-text').textContent = badgeText;
+        }
+        
+        async function updateConsent() {
+            const flags = {
+                physical_tag: document.getElementById('consent-physical').checked,
+                photo_visible: document.getElementById('consent-photo').checked,
+                location_share: document.getElementById('consent-location').checked
+            };
+            
+            updateConsentBadge();
+            
+            try {
+                const resp = await fetch('/api/player/consent', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(flags)
+                });
+                
+                if (resp.ok) {
+                    notify('Consent settings updated', 'success');
+                    playerData.consent_flags = flags;
+                } else {
+                    notify('Failed to update consent', 'error');
+                }
+            } catch (err) {
+                notify('Connection error', 'error');
+            }
+        }
+        
+        async function toggleReady() {
+            const newStatus = isReady ? 'lobby' : 'ready';
+            
+            try {
+                const resp = await fetch('/api/player', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: newStatus})
+                });
+                
+                if (resp.ok) {
+                    isReady = !isReady;
+                    updateReadyButton();
+                    notify(isReady ? 'You are ready!' : 'You are no longer ready', isReady ? 'success' : 'info');
+                } else {
+                    const data = await resp.json();
+                    notify(data.error || 'Failed to update status', 'error');
+                }
+            } catch (err) {
+                notify('Failed to update ready status', 'error');
+            }
+        }
+        
+        function updateReadyButton() {
+            const btn = document.getElementById('ready-btn');
+            if (isReady) {
+                btn.textContent = '❌ Click to Unready';
+                btn.className = 'btn btn-warning';
+            } else {
+                btn.textContent = '✅ Ready to Play';
+                btn.className = 'btn btn-success';
+            }
+        }
         let currentGameMode = "{{ game_mode }}";
         let modeConfig = {{ mode_config|tojson }};
         let emergencyActive = false;
@@ -1101,6 +1310,30 @@
             document.getElementById('your-safezone').textContent = player.in_safe_zone ? 'YES' : 'NO';
             document.getElementById('header-name').textContent = player.name;
             
+            // Sync ready state
+            isReady = player.status === 'ready' || player.ready === true;
+            updateReadyButton();
+            
+            // Sync consent flags
+            if (player.consent_flags) {
+                document.getElementById('consent-physical').checked = player.consent_flags.physical_tag || false;
+                document.getElementById('consent-photo').checked = player.consent_flags.photo_visible !== false;
+                document.getElementById('consent-location').checked = player.consent_flags.location_share !== false;
+                updateConsentBadge();
+            }
+            
+            // Sync ready state
+            isReady = player.status === 'ready' || player.ready === true;
+            updateReadyButton();
+            
+            // Sync consent flags
+            if (player.consent_flags) {
+                document.getElementById('consent-physical').checked = player.consent_flags.physical_tag || false;
+                document.getElementById('consent-photo').checked = player.consent_flags.photo_visible !== false;
+                document.getElementById('consent-location').checked = player.consent_flags.location_share !== false;
+                updateConsentBadge();
+            }
+            
             if (player.profile_pic) {
                 document.getElementById('profile-pic').src = player.profile_pic;
                 document.getElementById('header-pic').src = player.profile_pic;
@@ -1166,22 +1399,7 @@
             }
         }
         
-        async function setReady() {
-            try {
-                const resp = await fetch('/api/player', {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({status: 'ready'})
-                });
-                if (resp.ok) {
-                    notify('You are ready!', 'success');
-                    document.getElementById('ready-btn').textContent = '✅ Ready!';
-                    document.getElementById('ready-btn').disabled = true;
-                }
-            } catch (err) {
-                notify('Failed to set ready status', 'error');
-            }
-        }
+        // Ready toggle handled by toggleReady() function above
         
         async function uploadProfilePic(input) {
             if (!input.files[0]) return;
@@ -1336,7 +1554,10 @@
                                 ${escapeHtml(p.name)}
                                 ${p.team ? `<span style="font-size:10px;color:#48dbfb;">[${p.team}]</span>` : ''}
                             </div>
-                            <div class="lb-stats">${p.captures} captures${p.infections > 0 ? `, ${p.infections} infections` : ''}</div>
+                            <div class="lb-stats">
+                                ${p.captures} captures${p.infections > 0 ? `, ${p.infections} infections` : ''}
+                                ${p.consent_physical ? ' <span title="Physical contact OK" style="color:#00b894;">🤝</span>' : ''}
+                            </div>
                         </div>
                         <div class="lb-points">${p.points}</div>
                     </div>
@@ -1653,6 +1874,12 @@
         loadGallery();
         updateModeDisplay();
         loadPhotographedPrey();
+        initConsent();  // Initialize consent settings
+        isReady = playerData.status === 'ready';
+        updateReadyButton();
+        initConsent();  // Initialize consent settings
+        isReady = playerData.status === 'ready';
+        updateReadyButton();
         
         // Hide loading overlay
         setTimeout(() => {

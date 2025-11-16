@@ -291,11 +291,25 @@ In dashboard:
 - Can change in lobby
 - Once game starts, need safe zone to switch
 
-### 5.5 Ready Up
+### 5.5 Configure Consent Settings
 
-Click "✅ Ready to Play"
+Before readying up, players should configure their consent preferences:
+- **Physical Contact**: Allow gentle shoulder tap for captures (default: OFF)
+- **Photography**: Allow being photographed (default: ON)  
+- **Direct Messages**: Receive private chats (default: ON)
 
-Admin sees ready count increasing.
+These settings appear in the Profile section of the dashboard. The tracker OLED will show a "P" badge if physical contact is enabled.
+
+### 5.6 Ready Up
+
+Click "✅ Ready to Play" to signal you're ready.
+
+**Toggle Ready Status:**
+- Click "✅ Ready to Play" to become ready
+- Click "⏸️ Not Ready" to unready (change settings, take a break, etc.)
+- You can toggle as many times as needed before game starts
+
+Admin sees ready count updating in real-time.
 
 ---
 

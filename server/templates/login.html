@@ -247,6 +247,12 @@
                     <label>Your Nickname (optional)</label>
                     <input type="text" id="nickname" placeholder="e.g., ShadowWolf" maxlength="30">
                 </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="remember-me" checked>
+                        Remember my ID
+                    </label>
+                </div>
                 <button type="submit" class="btn btn-primary">
                     Enter Game 🎮
                 </button>
@@ -300,10 +306,14 @@
             setTimeout(() => err.style.display = 'none', 5000);
         }
         
-        // Load remembered device ID
+        // Load remembered device ID and nickname
         const rememberedId = localStorage.getItem('irlhunts_device_id');
+        const rememberedNick = localStorage.getItem('irlhunts_nickname');
         if (rememberedId) {
             document.getElementById('device_id').value = rememberedId;
+        }
+        if (rememberedNick) {
+            document.getElementById('nickname').value = rememberedNick;
         }
         
         async function loginPlayer(e) {
@@ -311,8 +321,14 @@
             const deviceId = document.getElementById('device_id').value.toUpperCase().trim();
             const nickname = document.getElementById('nickname').value.trim();
             
-            // Remember device ID for next time
-            localStorage.setItem('irlhunts_device_id', deviceId);
+            // Remember device ID for next time (if checkbox is checked)
+            if (document.getElementById('remember-me').checked) {
+                localStorage.setItem('irlhunts_device_id', deviceId);
+                localStorage.setItem('irlhunts_nickname', nickname);
+            } else {
+                localStorage.removeItem('irlhunts_device_id');
+                localStorage.removeItem('irlhunts_nickname');
+            }
             
             try {
                 const resp = await fetch('/api/login', {

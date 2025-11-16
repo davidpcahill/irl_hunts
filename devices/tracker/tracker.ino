@@ -129,7 +129,14 @@ String gamePhase = "lobby", gameMode = "classic", gameModeName = "Classic Hunt",
 bool inSafeZone = false, infectionMode = false, photoRequired = false;
 bool emergencyActive = false;
 String emergencyBy = "";
+bool consentPhysical = false;
+bool consentPhoto = true;
+String consentBadge = "";  // Visual badge for LoRa broadcasts
 bool wifiConnected = false, serverReachable = false;
+String consentBadge = "STD";  // Consent flags badge (STD=standard, T=touch OK, NP=no photo, NL=no location)
+bool myReady = false;
+String consentBadge = "STD";  // Consent flags badge (STD=standard, T=touch OK, NP=no photo, NL=no location)
+bool myReady = false;
 unsigned long lastWifiCheck = 0, lastSuccessfulPing = 0;
 int consecutivePingFails = 0;
 
@@ -221,6 +228,11 @@ void drawStatusBar() {
   statusLine += wifiConnected ? " [W]" : " [W!]";
   statusLine += serverReachable ? "[S]" : "[S?]";
   if (myTeam.length() > 0) statusLine += " " + myTeam.substring(0, 1);
+  // Show consent badge indicator
+  if (consentBadge != "STD" && consentBadge.length() > 0) {
+    statusLine += " [" + consentBadge + "]";
+  }
+  if (myReady) statusLine += " R";  // Ready indicator
   display.drawString(0, 0, statusLine);
 }
 
@@ -389,7 +401,8 @@ void displayEmergencyConfirm() {
 
 void sendBeacon() {
   String broadcastRole = (myRole == "unassigned") ? "unknown" : myRole;
-  String packet = NODE_ID + "|" + broadcastRole;
+  // Include consent badge in broadcast: ID|role|consent
+  String packet = NODE_ID + "|" + broadcastRole + "|" + consentBadge;
   radio.transmit(packet);
   radio.startReceive();
   txCount++;
@@ -416,6 +429,20 @@ void receivePackets() {
           int oldRssi = playerRssi.count(id) ? playerRssi[id] : -999;
           playerRssi[id] = (int)rssi;
           rxCount++;
+          
+          // Parse consent badge if present (format: ID|role|consent)
+          int sep2 = packet.indexOf('|', sep + 1);
+          String otherConsent = "STD";
+          if (sep2 > 0) {
+            otherConsent = packet.substring(sep2 + 1);
+          }
+          
+          // Parse consent badge if present (format: ID|role|consent)
+          int sep2 = packet.indexOf('|', sep + 1);
+          String otherConsent = "STD";
+          if (sep2 > 0) {
+            otherConsent = packet.substring(sep2 + 1);
+          }
           
           // Proximity warnings for prey
           if (!emergencyActive && myRole == "prey" && type == "pred" && !inSafeZone) {
@@ -478,8 +505,24 @@ void pingServer() {
       bool newInfection = respDoc["infection_mode"];
       bool newPhotoReq = respDoc["photo_required"];
       String newTeam = respDoc["team"].as<String>();
+      bool newConsentPhysical = respDoc["consent_physical"];
+      bool newConsentPhoto = respDoc["consent_photo"];
+      
+      // Update consent flags
+      if (consentPhysical != newConsentPhysical || consentPhoto != newConsentPhoto) {
+        consentPhysical = newConsentPhysical;
+        consentPhoto = newConsentPhoto;
+        // Update badge string for display
+        consentBadge = "";
+        if (consentPhysical) consentBadge += "🤝";
+        if (!consentPhoto) consentBadge += "📷❌";
+      }
+      String newConsentBadge = respDoc["consent_badge"].as<String>();
+      bool newReady = respDoc["ready"];
       
       if (newName.length() > 0) myName = newName;
+      if (newConsentBadge.length() > 0) consentBadge = newConsentBadge;
+      myReady = newReady;
       if (gameMode != newMode && newMode.length() > 0) {
         gameMode = newMode; gameModeName = newModeName;
         showNotification("Mode: " + newModeName, "info");

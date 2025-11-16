@@ -332,6 +332,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## ⚠️ Safety Notice
 
 **Always prioritize safety:**
+- **Respect consent settings** - Check for 🤝 badge before physical contact
 - Share game plans with someone not playing
 - Stay aware of surroundings
 - Set boundaries for play area
@@ -339,6 +340,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Use emergency button if needed
 - Stay hydrated
 - Watch for obstacles
+- **No non-consensual contact** - Only touch players who have opted in
 
 ---
 

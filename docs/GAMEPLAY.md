@@ -187,6 +187,63 @@ Photographs are REQUIRED before captures are allowed.
 
 ---
 
+
+
+---
+
+## 🤝 Consent System
+
+IRL Hunts includes a comprehensive consent system to ensure everyone feels safe and comfortable.
+
+### Consent Settings
+
+Players can configure these settings in their dashboard:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| **Physical Contact** | OFF | Allow gentle shoulder tap for captures |
+| **Photography** | ON | Can be photographed for sightings |
+| **Direct Messages** | ON | Receive private chat messages |
+
+### Visual Indicators
+
+**On Tracker OLED:**
+- `P` badge in status bar = Physical contact OK
+
+**On Web Dashboard:**
+- 🤝 icon = Physical contact OK
+- 📸 icon = Photography allowed
+
+**In LoRa Broadcasts:**
+- Consent flags transmitted to nearby players
+- Other trackers can see who allows physical tagging
+
+### Important Rules
+
+1. **ALWAYS check consent before physical contact**
+   - Look for the 🤝 badge on player's tracker or dashboard
+   - No badge = NO TOUCHING
+
+2. **Photography consent is respected automatically**
+   - System blocks photo sightings of players who opted out
+   - Their consent choice is enforced by server
+
+3. **Settings can be changed anytime**
+   - In lobby or during game
+   - Changes take effect immediately
+
+4. **Default is conservative**
+   - Physical contact defaults to OFF
+   - Players must explicitly opt-in
+
+### Why Consent Matters
+
+- Creates inclusive environment
+- Respects personal boundaries
+- Accommodates different comfort levels
+- Builds trust between players
+- Makes game accessible to more people
+
 ## 🚨 Emergency System
 
 ### Overview
@@ -290,11 +347,13 @@ The Emergency System is a **critical safety feature** that takes absolute priori
 
 **Line 1: Identity & Connection**
 ```
-T9EF0 [W][S] SAFE
+T9EF0 [W][S] [T] R SAFE
 ```
 - Your tracker ID
 - [W] = WiFi connected (or [W!] if disconnected)
 - [S] = Server connected (or [S?] if unreachable)
+- [T] = Consent badge (T=touch OK, NP=no photo, NL=no location)
+- R = Ready status
 - SAFE = Currently in safe zone
 
 **Line 2: Role & Game Mode**
@@ -461,13 +520,32 @@ Same as Classic, but survival bonus = +500
 - Have emergency contacts
 - Buddy system recommended
 - Report inappropriate behavior
+- **Respect ALL consent settings**
+- Review and set your consent preferences before playing
+- **Respect ALL consent settings**
+- Review and set your consent preferences before playing
 
 ### Fair Play
-- No physical contact
+- No non-consensual physical contact
+- Physical tagging (shoulder tap) only if BOTH players have enabled "physical_tag" consent
 - No equipment tampering
 - No blocking safe zone entrances
-- Respect other players
+- Respect other players' consent settings
 - Follow moderator instructions
+
+### Consent System
+Players can set their consent preferences:
+- **Physical Tag** (T): Allow consensual physical tagging (tap on shoulder)
+- **Photo Visible** (default ON): Allow photos to be taken
+- **Location Share** (default ON): Share location hints with other players
+
+Consent badges appear on tracker displays:
+- `STD` = Standard (default settings)
+- `T` = Touch/Physical tag OK
+- `NP` = No Photos please
+- `NL` = No Location sharing
+
+**ALWAYS respect consent settings!** If someone has disabled a feature, do not attempt to circumvent it.
 
 ---
 
