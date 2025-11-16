@@ -49,24 +49,37 @@ IRL Hunts is an outdoor game system that brings the thrill of digital gaming int
 ```
 irlhunts/
 ├── README.md                    # This file
+├── LICENSE                      # MIT License
+├── .gitignore                   # Git ignore rules
+├── TEST.md                      # Testing procedures
 ├── server/                      # Web server application
 │   ├── app.py                   # Main Flask server
+│   ├── config.py                # Default configuration
+│   ├── config_local.py.example  # Local config template
 │   ├── requirements.txt         # Python dependencies
+│   ├── uploads/                 # User-uploaded photos (gitignored contents)
 │   └── templates/               # Web interface
 │       ├── login.html           # Player/admin login
 │       ├── dashboard.html       # Player game interface
 │       └── admin.html           # Admin control panel
 ├── devices/                     # Arduino device code
 │   ├── tracker/                 # Player tracker
-│   │   └── tracker.ino          # Main tracker firmware
+│   │   ├── tracker.ino          # Main tracker firmware
+│   │   ├── config.h             # Default device config
+│   │   └── config_local.h.example  # Local config template
 │   └── beacon/                  # Safe zone beacon
-│       └── beacon.ino           # Beacon firmware
-├── docs/                        # Documentation
-│   ├── SETUP.md                 # Detailed setup guide
-│   ├── GAMEPLAY.md              # Game rules and strategies
-│   └── HARDWARE.md              # Hardware requirements
-└── LICENSE                      # MIT License
+│       ├── beacon.ino           # Beacon firmware
+│       ├── config.h             # Default device config
+│       └── config_local.h.example  # Local config template
+└── docs/                        # Documentation
+    ├── SETUP.md                 # Detailed setup guide
+    ├── GAMEPLAY.md              # Game rules and strategies
+    ├── HARDWARE.md              # Hardware requirements
+    ├── CONFIG.md                # Configuration guide
+    └── TEST.md                  # Testing procedures (duplicate)
 ```
+
+**Note:** Files ending in `.example` are templates. Copy them to create your local config files (without `.example`). Local config files contain credentials and are gitignored.
 
 ---
 
