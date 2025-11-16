@@ -952,95 +952,6 @@
                 btn.className = 'btn btn-success';
             }
         }
-        let isReady = false;
-        
-        // Initialize consent checkboxes from player data
-        function initConsent() {
-            const flags = playerData.consent_flags || {
-                physical_tag: false,
-                photo_visible: true,
-                location_share: true
-            };
-            document.getElementById('consent-physical').checked = flags.physical_tag;
-            document.getElementById('consent-photo').checked = flags.photo_visible;
-            document.getElementById('consent-location').checked = flags.location_share;
-            updateConsentBadge();
-        }
-        
-        function updateConsentBadge() {
-            const physical = document.getElementById('consent-physical').checked;
-            const photo = document.getElementById('consent-photo').checked;
-            const location = document.getElementById('consent-location').checked;
-            
-            let badge = [];
-            if (physical) badge.push("T");  // Touch OK
-            if (!photo) badge.push("NP");   // No Photo
-            if (!location) badge.push("NL"); // No Location
-            
-            const badgeText = badge.length > 0 ? badge.join("") : "STD";
-            document.getElementById('consent-badge-text').textContent = badgeText;
-        }
-        
-        async function updateConsent() {
-            const flags = {
-                physical_tag: document.getElementById('consent-physical').checked,
-                photo_visible: document.getElementById('consent-photo').checked,
-                location_share: document.getElementById('consent-location').checked
-            };
-            
-            updateConsentBadge();
-            
-            try {
-                const resp = await fetch('/api/player/consent', {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(flags)
-                });
-                
-                if (resp.ok) {
-                    notify('Consent settings updated', 'success');
-                    playerData.consent_flags = flags;
-                } else {
-                    notify('Failed to update consent', 'error');
-                }
-            } catch (err) {
-                notify('Connection error', 'error');
-            }
-        }
-        
-        async function toggleReady() {
-            const newStatus = isReady ? 'lobby' : 'ready';
-            
-            try {
-                const resp = await fetch('/api/player', {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({status: newStatus})
-                });
-                
-                if (resp.ok) {
-                    isReady = !isReady;
-                    updateReadyButton();
-                    notify(isReady ? 'You are ready!' : 'You are no longer ready', isReady ? 'success' : 'info');
-                } else {
-                    const data = await resp.json();
-                    notify(data.error || 'Failed to update status', 'error');
-                }
-            } catch (err) {
-                notify('Failed to update ready status', 'error');
-            }
-        }
-        
-        function updateReadyButton() {
-            const btn = document.getElementById('ready-btn');
-            if (isReady) {
-                btn.textContent = '❌ Click to Unready';
-                btn.className = 'btn btn-warning';
-            } else {
-                btn.textContent = '✅ Ready to Play';
-                btn.className = 'btn btn-success';
-            }
-        }
         let currentGameMode = "{{ game_mode }}";
         let modeConfig = {{ mode_config|tojson }};
         let emergencyActive = false;
@@ -1874,9 +1785,6 @@
         loadGallery();
         updateModeDisplay();
         loadPhotographedPrey();
-        initConsent();  // Initialize consent settings
-        isReady = playerData.status === 'ready';
-        updateReadyButton();
         initConsent();  // Initialize consent settings
         isReady = playerData.status === 'ready';
         updateReadyButton();

@@ -508,15 +508,6 @@ void pingServer() {
       bool newConsentPhysical = respDoc["consent_physical"];
       bool newConsentPhoto = respDoc["consent_photo"];
       
-      // Update consent flags
-      if (consentPhysical != newConsentPhysical || consentPhoto != newConsentPhoto) {
-        consentPhysical = newConsentPhysical;
-        consentPhoto = newConsentPhoto;
-        // Update badge string for display
-        consentBadge = "";
-        if (consentPhysical) consentBadge += "🤝";
-        if (!consentPhoto) consentBadge += "📷❌";
-      }
       String newConsentBadge = respDoc["consent_badge"].as<String>();
       bool newReady = respDoc["ready"];
       

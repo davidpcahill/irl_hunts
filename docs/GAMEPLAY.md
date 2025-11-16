@@ -522,8 +522,6 @@ Same as Classic, but survival bonus = +500
 - Report inappropriate behavior
 - **Respect ALL consent settings**
 - Review and set your consent preferences before playing
-- **Respect ALL consent settings**
-- Review and set your consent preferences before playing
 
 ### Fair Play
 - No non-consensual physical contact

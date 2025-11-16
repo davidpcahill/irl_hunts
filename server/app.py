@@ -868,13 +868,6 @@ def api_update_player():
                 player["consent_flags"][key] = bool(data["consent_flags"][key])
         log_event("consent_update", {"player": player["name"], "flags": player["consent_flags"]})
     
-    # Update consent flags if provided
-    if "consent_flags" in data and isinstance(data["consent_flags"], dict):
-        for key in ["physical_tag", "photo_visible", "location_share"]:
-            if key in data["consent_flags"]:
-                player["consent_flags"][key] = bool(data["consent_flags"][key])
-        log_event("consent_update", {"player": player["name"], "flags": player["consent_flags"]})
-    
     player["last_seen"] = now()
     player["last_ping"] = time.time()
     socketio.emit("player_update", player, room="all")
@@ -1044,10 +1037,6 @@ def api_upload_sighting():
         return jsonify({"error": "Preds can only spot prey"}), 400
     if player["role"] == "prey" and target["role"] != "pred":
         return jsonify({"error": "Prey can only spot preds"}), 400
-    
-    # Check consent for photography
-    if not target.get("consent_flags", {}).get("photo_visible", True):
-        return jsonify({"error": f"{target['name']} has disabled photo visibility"}), 403
     
     # Check consent for photography
     if not target.get("consent_flags", {}).get("photo_visible", True):

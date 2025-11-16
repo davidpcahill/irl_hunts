@@ -25,6 +25,7 @@ IRL Hunts is an outdoor game system that brings the thrill of digital gaming int
 - **Live leaderboards** - Rankings update in real-time
 - **Team chat** - Coordinate strategies with your team
 - **Custom profiles** - Nicknames and profile pictures
+- **Consent system** - Players control physical contact, photography, and location sharing preferences
 
 ### 🔧 Technology
 - **LoRa mesh networking** - 1km+ range, no cellular needed
@@ -332,7 +333,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## ⚠️ Safety Notice
 
 **Always prioritize safety:**
-- **Respect consent settings** - Check for 🤝 badge before physical contact
+- **Respect ALL consent settings** - Check badges before any interaction
+  - 🤝 = Physical contact OK (gentle shoulder tap)
+  - No badge = NO touching allowed
+  - Players can disable photos and location sharing
 - Share game plans with someone not playing
 - Stay aware of surroundings
 - Set boundaries for play area
@@ -340,7 +344,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Use emergency button if needed
 - Stay hydrated
 - Watch for obstacles
-- **No non-consensual contact** - Only touch players who have opted in
+- **Consent is mandatory** - Violating consent settings may result in removal
 
 ---
 
