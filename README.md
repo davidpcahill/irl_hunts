@@ -2,7 +2,7 @@
 
 **A real-world augmented reality game of predator vs prey using LoRa mesh networking**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![License: SA-NC-NR](https://img.shields.io/badge/License-SA--NC--NR-orange)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Heltec%20V3-orange.svg)](https://heltec.org/)
 
