@@ -48,40 +48,44 @@ IRL Hunts is an outdoor game system that brings the thrill of digital gaming int
 
 ```
 irlhunts/
-├── README.md                    # This file
-├── LICENSE                      # MIT License
-├── .gitignore                   # Git ignore rules (keeps credentials safe)
+├── README.md                    # Project overview
+├── LICENSE                      # Custom source-available, non-commercial license
+├── cleanup.py                   # Maintenance / utility script
+├── .gitignore                   # Git ignore rules
+│
 ├── server/                      # Web server application
 │   ├── app.py                   # Main Flask server
-│   ├── config.py                # Default configuration (documented)
-│   ├── config_local.py.example  # Template for your local overrides
-│   ├── config_local.py          # YOUR settings (gitignored, you create this)
+│   ├── config.py                # Default configuration
+│   ├── config_local.py.example  # Template for user-specific overrides
 │   ├── requirements.txt         # Python dependencies
-│   ├── uploads/                 # User-uploaded photos (contents gitignored)
-│   │   └── .gitkeep             # Keeps folder in git
 │   └── templates/               # Web interface
-│       ├── login.html           # Player/admin login
-│       ├── dashboard.html       # Player game interface
-│       └── admin.html           # Admin control panel
-├── devices/                     # Arduino device code
-│   ├── tracker/                 # Player tracker
-│   │   ├── tracker.ino          # Main tracker firmware
-│   │   ├── config.h             # Default device settings (documented)
-│   │   ├── config_local.h.example  # Template for your WiFi/server settings
-│   │   └── config_local.h       # YOUR settings (gitignored, you create this)
-│   └── beacon/                  # Safe zone beacon
-│       ├── beacon.ino           # Beacon firmware
-│       ├── config.h             # Default device settings (documented)
-│       ├── config_local.h.example  # Template for your settings
-│       └── config_local.h       # YOUR settings (gitignored, you create this)
+│       ├── login.html
+│       ├── dashboard.html
+│       └── admin.html
+│
+├── devices/                     # Firmware for hardware devices
+│   ├── tracker/                 # Player tracker device
+│   │   ├── tracker.ino
+│   │   ├── config.h
+│   │   ├── config_local.h.example
+│   │   └── (config_local.h is user-created and gitignored)
+│   │
+│   └── beacon/                  # Safe-zone beacon device
+│       ├── beacon.ino
+│       ├── config.h
+│       ├── config_local.h.example
+│       └── (config_local.h is user-created and gitignored)
+│
 └── docs/                        # Documentation
-    ├── SETUP.md                 # Detailed setup guide
-    ├── GAMEPLAY.md              # Game rules and strategies
-    ├── API.md                   # API reference
-    ├── HARDWARE.md              # Hardware requirements
-    ├── CONFIG.md                # Configuration options reference
-    ├── CONFIG_SYSTEM.md         # How the config system works
-    └── TEST.md                  # Testing procedures
+    ├── API.md
+    ├── CONFIG.md
+    ├── CONFIG_SYSTEM.md
+    ├── FAQ.md
+    ├── GAMEPLAY.md
+    ├── HARDWARE.md
+    ├── SETUP.md
+    └── TEST.md
+
 ```
 
 
